@@ -31,5 +31,4 @@ public class VehicleController {
     public ResponseEntity<String> unparkVehicle(@PathVariable String ticketNumber) {
         return ResponseEntity.status(HttpStatus.CREATED).body(iVehicleService.unparkVehicle(ticketNumber));
     }
-
 }

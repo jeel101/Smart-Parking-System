@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -84,21 +85,32 @@ public class SlotImpl implements ISlotService{
         List<SlotAvailabilityDto> result = new ArrayList<>();
 
         for (Slot slot : allSlots) {
-            if(slot.getSlotStatus() == SlotStatus.OCCUPIED) {
-                result.add(mapToDto(slot, false, SlotStatus.OCCUPIED.toString()));
-                continue;
-            }
-
-            boolean overlapping =ticketRepository.existsOverlappingReservation(
+            Optional<Ticket> overlappingticket =ticketRepository.findOverlappingTicket(
                                     slot,
                                     endTime,
                                     startTime
                             );
 
-            if (overlapping) {
-                result.add(mapToDto(slot, true, "RESERVED"));
+            System.out.println("REQUEST:");
+            System.out.println(startTime);
+            System.out.println(endTime);
+
+            System.out.println("FOUND = " + overlappingticket.isPresent());
+
+            if (overlappingticket.isPresent()) {
+                Ticket ticket = overlappingticket.get();
+                System.out.println("SLOT = " + slot.getSlotNum() +
+                        "TYPE = " + ticket.getReservationType() +
+                        "ENTRY = " + ticket.getEntryTime() +
+                        "EXIT = " + ticket.getExitTime());
+                if (ticket.getReservationType() == ReservationType.INSTANT) {
+                    result.add(mapToDto(slot, false, "OCCUPIED"));
+               }
+                else {
+                    result.add(mapToDto(slot, false, "RESERVED"));
+                }
             }else {
-                result.add(mapToDto(slot, true, SlotStatus.AVAILABLE.toString()));
+                result.add(mapToDto(slot, true, "AVAILABLE"));
             }
         }
 

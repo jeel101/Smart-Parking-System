@@ -1,16 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { unparkVehicle } from "../services/UnParkService";
 import { toast } from "react-toastify";
+import apiClient from "../api/apiClient";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function TicketPage() {
-  const stored = localStorage.getItem("tickets");
-  const [tickets, setTickets] = useState(
-    JSON.parse(localStorage.getItem("tickets")) || [],
-  );
+  const [tickets, setTickets] = useState([]);
 
-  if (!stored) {
-    return <p className="text-center mt-10">No ticket found</p>;
-  }
+  //fetch latest tickets from backend
+  const fetchTickets = async () => {
+    try {
+      const response = await apiClient.get("/ticket/get-ticket");
+      setTickets(response.data);
+      localStorage.setItem("tickets", JSON.stringify(response.data));
+    } catch (error) {
+      toast.error("Failed to fetch tickets");
+    }
+  };
+
+  //auto refresh
+  useEffect(() => {
+    fetchTickets();
+
+    const interval = setInterval(() => {
+      fetchTickets();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   if (!tickets.length) {
     return <p className="text-center mt-10 text-lg">No tickets found</p>;
@@ -87,12 +104,14 @@ export default function TicketPage() {
                 <strong>Status:</strong> {ticket.status || "OPEN"}
               </p>
 
-              <button
-                onClick={() => handleUnpark(ticket.ticketNumber)}
-                className="mt-4 w-full bg-primary py-2 rounded-lg hover:bg-accent"
-              >
-                Unpark Vehicle
-              </button>
+              {ticket.status === "OPEN" && (
+                <button
+                  onClick={() => handleUnpark(ticket.ticketNumber)}
+                  className="mt-4 w-full bg-primary py-2 rounded-lg hover:bg-accent"
+                >
+                  Unpark Vehicle
+                </button>
+              )}
             </div>
           </div>
         ))}

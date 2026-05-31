@@ -1,5 +1,6 @@
 package com.parkingsystem.parkingsystem.repository;
 
+import com.parkingsystem.parkingsystem.dto.TicketDto;
 import com.parkingsystem.parkingsystem.entity.Slot;
 import com.parkingsystem.parkingsystem.entity.Ticket;
 import com.parkingsystem.parkingsystem.entity.TicketStatus;
@@ -16,9 +17,9 @@ import java.util.Optional;
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
-    boolean existsByVehicleAndExitTimeIsNull(Vehicle vehicle);
+    boolean existsByVehicleAndStatus(Vehicle vehicle, TicketStatus status);
     Optional<Ticket> findByTicketNumber(String ticketNumber);
-//    List<Ticket> findByStatus(TicketStatus status);
+    List<Ticket> findAllByStatus(TicketStatus status);
     List<Ticket> findAllByStatusAndExitTimeBefore(TicketStatus status,LocalDateTime time);
 
     @Query("""
@@ -34,6 +35,24 @@ AND (
 )
 """)
     boolean existsOverlappingReservation(
+            @Param("slot") Slot slot,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("startTime") LocalDateTime startTime
+    );
+
+    @Query("""
+SELECT t
+FROM Ticket t
+WHERE t.slot = :slot
+AND t.status = 'OPEN'
+AND t.exitTime IS NOT NULL
+AND (
+    t.entryTime < :endTime
+    AND
+    t.exitTime > :startTime
+)
+""")
+    Optional<Ticket> findOverlappingTicket(
             @Param("slot") Slot slot,
             @Param("endTime") LocalDateTime endTime,
             @Param("startTime") LocalDateTime startTime

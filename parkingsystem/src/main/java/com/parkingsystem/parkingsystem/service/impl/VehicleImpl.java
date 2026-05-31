@@ -110,13 +110,10 @@ public class VehicleImpl implements IVehicleService {
 
     @Override
     public String unparkVehicle(String ticketNumber) {
-        System.out.println("STEP 1: Method started");
         //find ticket
         Ticket ticket = ticketRepository.findByTicketNumber(ticketNumber).orElseThrow(
                 () -> new RuntimeException("Ticket not found")
         );
-
-        System.out.println("STEP 2: Ticket found");
 
         // prevent double unpark
         if (ticket.getStatus() == TicketStatus.CLOSED) {
@@ -124,21 +121,13 @@ public class VehicleImpl implements IVehicleService {
         }
         ticket.setExitTime(LocalDateTime.now());
         ticket.setStatus(TicketStatus.CLOSED);
-
-        System.out.println("STEP 3: Ticket status updated");
         //free slot
         Slot slot = ticket.getSlot();
-        System.out.println("STEP 4: Slot fetched");
-        slot.setSlotStatus(SlotStatus.AVAILABLE);
+//        slot.setSlotStatus(SlotStatus.AVAILABLE);
         slotRepository.save(slot);
 
-        System.out.println("STEP 5: Slot released");
         if (ticket.getReservationType() == ReservationType.INSTANT) {
-
-            long hours = Duration.between(
-                    ticket.getEntryTime(),
-                    ticket.getExitTime()
-            ).toHours();
+            long hours = Duration.between(ticket.getEntryTime(),ticket.getExitTime()).toHours();
 
             // minimum 1 hour charge
             if (hours == 0) {
@@ -155,11 +144,8 @@ public class VehicleImpl implements IVehicleService {
             }
             ticket.setDuration(hours);
             ticket.setPrice(price);
-
-            System.out.println("STEP 6: Instant booking price calculated");
         }
 
-        System.out.println("STEP 6: Queue checked");
         //getting next vehicle from queue
         Vehicle nextVehicle = queueService.getNext(slot.getSlotType());
 
@@ -168,11 +154,7 @@ public class VehicleImpl implements IVehicleService {
         }
 
         ticketRepository.save(ticket);
-        System.out.println("STEP 7: Ticket saved");
-        return ("Ticket closed successfully"
-                + ticket.getDuration()
-                + " hours | Price: ₹"
-                + ticket.getPrice());
+        return ("Ticket closed successfully" + ticket.getDuration() + " hours | Price: ₹" + ticket.getPrice());
     }
 
     private List<VehicleType> getAllowedTypes(VehicleType type) {
@@ -191,11 +173,14 @@ public class VehicleImpl implements IVehicleService {
         List<Ticket> expiredTickets = ticketRepository.findAllByStatusAndExitTimeBefore(TicketStatus.OPEN, LocalDateTime.now());
 
         for(Ticket tickets: expiredTickets) {
-            if(tickets.getReservationType() == ReservationType.INSTANT) {
-                continue;
-            }
             tickets.setStatus(TicketStatus.CLOSED);
             Slot slot = tickets.getSlot();
+
+            if(tickets.getReservationType() == ReservationType.INSTANT) {
+                slot.setSlotStatus(SlotStatus.AVAILABLE);
+            }
+
+            slotRepository.save(slot);
             ticketRepository.save(tickets);
             System.out.println("Ticket: " + tickets.getTicketNumber() + "has been expired and cloes!");
         }
@@ -231,8 +216,7 @@ public class VehicleImpl implements IVehicleService {
                                                  LocalDateTime endTime,
                                                  Slot slot)  {
         // reservation check
-        boolean isReservation =
-                !bookingType.equals("INSTANT");
+        boolean isReservation = !bookingType.equals("INSTANT");
 
         if(isReservation) {
             boolean alreadyReserved = ticketRepository.existsOverlappingReservation(
@@ -256,26 +240,28 @@ public class VehicleImpl implements IVehicleService {
         }
 
         // prevent duplicate parking
-        boolean alreadyParked =
-                ticketRepository.existsByVehicleAndExitTimeIsNull(vehicle);
+        boolean alreadyParked = ticketRepository.existsByVehicleAndStatus(vehicle, TicketStatus.OPEN);
 
         if (alreadyParked) {
             throw new RuntimeException("Vehicle already parked");
         }
 
-        // for instant booking only,
-        // slot must not be occupied
-        if (!isReservation && slot.getSlotStatus() != SlotStatus.AVAILABLE
-        ) {
+        System.out.println("BOOKING TYPE = " + bookingType);
+        System.out.println("IS RESERVATION = " + isReservation);
+        System.out.println("SLOT ID = " + slot.getSlotId());
+        System.out.println("SLOT STATUS = " + slot.getSlotStatus());
+
+        // for instant booking only, slot must not be occupied
+        if (!isReservation && slot.getSlotStatus() != SlotStatus.AVAILABLE) {
             throw new RuntimeException(
                     "Selected slot is occupied"
             );
         }
 
         // mark slot status
-        if (!isReservation) {
-            slot.setSlotStatus(SlotStatus.OCCUPIED);
-        }
+//        if (!isReservation) {
+//            slot.setSlotStatus(SlotStatus.OCCUPIED);
+//        }
 
         slotRepository.save(slot);
 
@@ -321,6 +307,7 @@ public class VehicleImpl implements IVehicleService {
         // instant booking logic
         else {
             ticket.setEntryTime(LocalDateTime.now());
+            ticket.setExitTime(LocalDateTime.now().plusHours(12));
             ticket.setPrice(0);
             ticket.setDuration(0L);
         }

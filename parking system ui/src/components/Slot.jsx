@@ -65,14 +65,15 @@ export default function Slot() {
 
         // instant bookings
         else {
+          const now = new Date();
+          const oneMinuteLater = new Date(Date.now() + 60000);
+
           res = await apiClient.get(`/slot/available`, {
             params: {
               floorId,
-
-              // CHANGED: send current time
-              startTime: new Date().toISOString().slice(0, 19),
-
-              endTime: new Date().toISOString().slice(0, 19),
+              //send current time
+              startTime: formatLocalDateTime(now),
+              endTime: formatLocalDateTime(oneMinuteLater), // +1 min
             },
           });
         }
@@ -93,6 +94,12 @@ export default function Slot() {
     return null;
   };
 
+  //local date time for instant booking validation
+  const formatLocalDateTime = (date) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  };
+
   // park by selected slot
   const handleParkBySlot = async () => {
     if (!selectedSlot) {
@@ -106,11 +113,6 @@ export default function Slot() {
     }
     //dates validatrion for reservation
     if (!validateReservationDates(reservationType, startTime, endTime)) return;
-
-    // if (reservationType !== "INSTANT" && (!startTime || !endTime)) {
-    //   toast.error("Select start and end time");
-    //   return;
-    // }
 
     try {
       const res = await apiClient.post("/vehicle/park-by-slot", {
@@ -142,8 +144,18 @@ export default function Slot() {
             endTime: `${endTime}T00:00:00`,
           },
         });
-      } else {
-        updated = await apiClient.get(`/slot/floor/${floorId}`);
+      } // CHANGED: instant booking refresh
+      else {
+        const now = new Date();
+        const oneMinuteLater = new Date(Date.now() + 60000);
+
+        updated = await apiClient.get(`/slot/available`, {
+          params: {
+            floorId,
+            startTime: formatLocalDateTime(now),
+            endTime: formatLocalDateTime(oneMinuteLater),
+          },
+        });
       }
 
       setSlots(updated.data);
@@ -165,16 +177,11 @@ export default function Slot() {
 
   return (
     <div className="min-h-screen bg-base p-8 max-w-6xl mx-auto">
-      {/* ============================================ */}
       {/* TITLE */}
-      {/* ============================================ */}
 
       <h2 className="text-3xl font-bold mb-6">Parking Lot {parkingLotId}</h2>
 
-      {/* ============================================ */}
       {/* FILTERS */}
-      {/* ============================================ */}
-
       <div className="flex flex-wrap gap-4 mb-8 items-center">
         {/* FLOOR */}
         <select
@@ -260,7 +267,7 @@ export default function Slot() {
 
           return (
             <div
-              key={slot.id}
+              key={slot.slotId}
               onClick={() => slot.available && setSelectedSlot(slot)}
               className={`
                 w-28 h-28 rounded-xl border shadow-md
