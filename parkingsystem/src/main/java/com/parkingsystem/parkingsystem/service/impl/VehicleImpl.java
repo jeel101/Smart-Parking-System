@@ -127,25 +127,8 @@ public class VehicleImpl implements IVehicleService {
         slotRepository.save(slot);
 
         if (ticket.getReservationType() == ReservationType.INSTANT) {
-            long hours = Duration.between(ticket.getEntryTime(),ticket.getExitTime()).toHours();
-
-            // minimum 1 hour charge
-            if (hours == 0) {
-                hours = 1;
-            }
-
-            double price;
-
-            switch (ticket.getVehicle().getVehicleType()) {
-                case CAR -> price = hours * 20;
-                case BIKE -> price = hours * 10;
-                case TRUCK -> price = hours * 40;
-                default -> price = hours * 20;
-            }
-            ticket.setDuration(hours);
-            ticket.setPrice(price);
+            closeTicket(ticket);
         }
-
         //getting next vehicle from queue
         Vehicle nextVehicle = queueService.getNext(slot.getSlotType());
 
@@ -153,7 +136,6 @@ public class VehicleImpl implements IVehicleService {
             System.out.println("Next vehicle in queue: " + nextVehicle.getVehicleNumber());
         }
 
-        ticketRepository.save(ticket);
         return ("Ticket closed successfully" + ticket.getDuration() + " hours | Price: ₹" + ticket.getPrice());
     }
 
@@ -168,20 +150,41 @@ public class VehicleImpl implements IVehicleService {
         return List.of(type);
     }
 
+    private void closeTicket(Ticket ticket) {
+        long hours = Duration.between(ticket.getEntryTime(),ticket.getExitTime()).toHours();
+
+        // minimum 1 hour charge
+        if (hours == 0) {
+            hours = 1;
+        }
+
+        double price;
+
+        switch (ticket.getVehicle().getVehicleType()) {
+            case CAR -> price = hours * 20;
+            case BIKE -> price = hours * 10;
+            case TRUCK -> price = hours * 40;
+            default -> price = hours * 20;
+        }
+        ticket.setDuration(hours);
+        ticket.setPrice(price);
+        ticketRepository.save(ticket);
+    }
+
     @Scheduled(fixedRate = 60000)
     public void autoCloseExpiredReservations() {
         List<Ticket> expiredTickets = ticketRepository.findAllByStatusAndExitTimeBefore(TicketStatus.OPEN, LocalDateTime.now());
 
         for(Ticket tickets: expiredTickets) {
-            tickets.setStatus(TicketStatus.CLOSED);
+            tickets.setStatus(TicketStatus.EXPIRED);
+            ticketRepository.save(tickets);
             Slot slot = tickets.getSlot();
 
             if(tickets.getReservationType() == ReservationType.INSTANT) {
                 slot.setSlotStatus(SlotStatus.AVAILABLE);
+                closeTicket(tickets);
             }
-
             slotRepository.save(slot);
-            ticketRepository.save(tickets);
             System.out.println("Ticket: " + tickets.getTicketNumber() + "has been expired and cloes!");
         }
     }
@@ -245,11 +248,6 @@ public class VehicleImpl implements IVehicleService {
         if (alreadyParked) {
             throw new RuntimeException("Vehicle already parked");
         }
-
-        System.out.println("BOOKING TYPE = " + bookingType);
-        System.out.println("IS RESERVATION = " + isReservation);
-        System.out.println("SLOT ID = " + slot.getSlotId());
-        System.out.println("SLOT STATUS = " + slot.getSlotStatus());
 
         // for instant booking only, slot must not be occupied
         if (!isReservation && slot.getSlotStatus() != SlotStatus.AVAILABLE) {

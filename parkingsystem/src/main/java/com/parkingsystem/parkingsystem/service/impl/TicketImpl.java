@@ -14,8 +14,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TicketImpl  implements ITicketImpl {
     private final TicketRepository ticketRepository;
-    public List<TicketDto> getAllTickets() {
-        return ticketRepository.findAllByStatus(TicketStatus.OPEN).stream().map(this::mapToTicketDto).toList();
+    public List<TicketDto> getAllTickets(TicketStatus status) {
+        return ticketRepository.findAllByStatus(status).stream().map(this::mapToTicketDto).toList();
     }
 
     private TicketDto mapToTicketDto(Ticket ticket) {

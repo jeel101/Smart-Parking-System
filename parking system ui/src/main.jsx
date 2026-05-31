@@ -6,8 +6,8 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AdminSlot from "./components/admin/AdminSlot.jsx";
 import Slot from "./components/Slot.jsx";
 import Parking from "./components/Parking.jsx";
-import TicketPage from "./components/TicketPage.jsx";
 import PakringDashboard from "./components/PakringDashboard.jsx";
+import TicketDashboard from "./components/TicketDashboard.jsx";
 
 const router = createBrowserRouter([
   {
@@ -19,8 +19,8 @@ const router = createBrowserRouter([
         element: <AdminSlot />,
       },
       {
-        path: "/tickets",
-        element: <TicketPage />,
+        path: "/ticket-dashboard",
+        element: <TicketDashboard />,
       },
       {
         path: "/parking-dashboard",
