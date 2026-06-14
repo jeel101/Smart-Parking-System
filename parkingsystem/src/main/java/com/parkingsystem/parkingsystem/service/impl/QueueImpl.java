@@ -8,10 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -41,5 +38,10 @@ public class QueueImpl implements QueueService {
 
     public Long getQueuesize(VehicleType type) {
        return redisTemplate.opsForList().size(getQueueKey(type));
+    }
+
+    @Override
+    public List<Object> getQueue(VehicleType type) {
+        return redisTemplate.opsForList().range(getQueueKey(type), 0, -1);
     }
 }

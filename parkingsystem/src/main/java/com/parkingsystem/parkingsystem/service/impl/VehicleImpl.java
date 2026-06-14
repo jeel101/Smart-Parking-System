@@ -30,19 +30,14 @@ public class VehicleImpl implements IVehicleService {
     @Override
     @CacheEvict(value = "slotAvailability", allEntries = true)
     public TicketDto parkVehicle(TicketRequestDto request) {
-        VehicleType type =
-                VehicleType.valueOf(request.getVehicleType());
+        VehicleType type = VehicleType.valueOf(request.getVehicleType());
 
-        List<VehicleType> allowedTypes =
-                getAllowedTypes(type);
+        List<VehicleType> allowedTypes = getAllowedTypes(type);
 
-        List<Slot> slot = slotRepository.findByFloor_ParkingLot_Id_AndSlotTypeInAndSlotStatus(
-                1L, allowedTypes,SlotStatus.AVAILABLE
-        );
+        List<Slot> slot = slotRepository.findByFloor_ParkingLot_Id_AndSlotTypeIn(1L, allowedTypes);
 
         // find or create vehicle first
-        Vehicle vehicle =
-                vehicleRepository
+        Vehicle vehicle = vehicleRepository
                         .findByVehicleNumber(request.getVehicleNumber())
                         .orElseGet(() -> {
                             Vehicle v = new Vehicle();
@@ -53,7 +48,22 @@ public class VehicleImpl implements IVehicleService {
                             return vehicleRepository.save(v);
                         });
 
-        if(slot.isEmpty()) {
+        //filter vehicles
+        List<Slot> availableSots = slot.stream().filter(slots -> {
+            LocalDateTime startTime;
+            LocalDateTime endTime;
+
+            if(request.getBookingType().equals("INSTANT")) {
+                startTime = LocalDateTime.now();
+                endTime = LocalDateTime.now().plusMinutes(1);
+            }else {
+                startTime = request.getStartTime();
+                endTime = request.getEndTime();
+            }
+            return ticketRepository.findOverlappingTicket(slots,endTime, startTime).isEmpty();
+        }).toList();
+
+        if(availableSots.isEmpty()) {
             if(request.getBookingType().equals("INSTANT")) {
                 queueService.addToQueue(vehicle);
                 throw new RuntimeException("Parking full. Added to waiting queue.");
@@ -62,17 +72,17 @@ public class VehicleImpl implements IVehicleService {
         }
 
         //sorting for nearest slot
-        slot.sort(Comparator.comparing((Slot s) -> s.getFloor().getFloorNum()).
+        availableSots.sort(Comparator.comparing((Slot s) -> s.getFloor().getFloorNum()).
                 thenComparing(s -> Integer.parseInt(s.getSlotNum().split("S")[1])));
 
-        Slot slots = slot.get(0);
+        Slot selectedSlot = availableSots.get(0);
 
         return parkVehicleandCreateTicket(
                 vehicle,
                 request.getBookingType(),
                 request.getStartTime(),
                 request.getEndTime(),
-                slots
+                selectedSlot
         );
     }
 
@@ -141,6 +151,7 @@ public class VehicleImpl implements IVehicleService {
         if (nextVehicle != null) {
             System.out.println("Next vehicle in queue: " + nextVehicle.getVehicleNumber());
         }
+        ticketRepository.save(ticket);
 
         return ("Ticket closed successfully" + ticket.getDuration() + " hours | Price: ₹" + ticket.getPrice());
     }

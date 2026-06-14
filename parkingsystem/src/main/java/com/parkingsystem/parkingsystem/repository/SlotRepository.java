@@ -14,6 +14,6 @@ public interface SlotRepository extends JpaRepository<Slot, Long> {
     int countByFloor_Id(Long floorId);
     int countByFloor_ParkingLot_Id(Long parkingLotId);
     int countByFloor_Id_AndSlotStatus(Long floorId, SlotStatus status);
-    List<Slot> findByFloor_ParkingLot_Id_AndSlotTypeInAndSlotStatus(Long parkingLotId, List<VehicleType> types, SlotStatus slotStatus);
+    List<Slot> findByFloor_ParkingLot_Id_AndSlotTypeIn(Long parkingLotId, List<VehicleType> types);
     List<Slot> findByFloor_Id(Long floorId);
 }
