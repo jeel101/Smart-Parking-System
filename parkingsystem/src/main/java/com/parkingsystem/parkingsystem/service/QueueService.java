@@ -6,4 +6,5 @@ import com.parkingsystem.parkingsystem.entity.VehicleType;
 public interface QueueService {
     void addToQueue(Vehicle vehicle);
     Vehicle getNext(VehicleType type);
+    public Long getQueuesize(VehicleType type);
 }

@@ -7,6 +7,7 @@ import com.parkingsystem.parkingsystem.repository.SlotRepository;
 import com.parkingsystem.parkingsystem.repository.TicketRepository;
 import com.parkingsystem.parkingsystem.service.ISlotService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -80,6 +81,8 @@ public class SlotImpl implements ISlotService{
     }
 
     @Override
+    @Cacheable(value = "slotAvailability",
+                key = "#floorId")
     public List<SlotAvailabilityDto> getAvailableSlots(Long floorId, LocalDateTime startTime, LocalDateTime endTime) {
         List<Slot> allSlots = slotRepository.findByFloor_Id(floorId);
         List<SlotAvailabilityDto> result = new ArrayList<>();
@@ -113,6 +116,9 @@ public class SlotImpl implements ISlotService{
                 result.add(mapToDto(slot, true, "AVAILABLE"));
             }
         }
+        System.out.println(
+                "DB HIT FOR SLOT SEARCH"
+        );
 
         return result;
     }

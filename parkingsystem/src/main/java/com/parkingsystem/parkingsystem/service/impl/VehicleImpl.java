@@ -10,6 +10,7 @@ import com.parkingsystem.parkingsystem.repository.VehicleRepository;
 import com.parkingsystem.parkingsystem.service.IVehicleService;
 import com.parkingsystem.parkingsystem.service.QueueService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,7 @@ public class VehicleImpl implements IVehicleService {
     private final TicketRepository ticketRepository;
     private final QueueService queueService;
     @Override
+    @CacheEvict(value = "slotAvailability", allEntries = true)
     public TicketDto parkVehicle(TicketRequestDto request) {
         VehicleType type =
                 VehicleType.valueOf(request.getVehicleType());
@@ -52,8 +54,10 @@ public class VehicleImpl implements IVehicleService {
                         });
 
         if(slot.isEmpty()) {
-            queueService.addToQueue(vehicle);
-
+            if(request.getBookingType().equals("INSTANT")) {
+                queueService.addToQueue(vehicle);
+                throw new RuntimeException("Parking full. Added to waiting queue.");
+            }
             throw new RuntimeException("No slot available");
         }
 
@@ -73,6 +77,7 @@ public class VehicleImpl implements IVehicleService {
     }
 
     @Override
+    @CacheEvict(value = "slotAvailability", allEntries = true)
     public TicketDto parkBySelectedSlot(SlotParkingRequestDto request) {
 
         Slot slot = slotRepository.findById(
@@ -109,6 +114,7 @@ public class VehicleImpl implements IVehicleService {
     }
 
     @Override
+    @CacheEvict(value = "slotAvailability", allEntries = true)
     public String unparkVehicle(String ticketNumber) {
         //find ticket
         Ticket ticket = ticketRepository.findByTicketNumber(ticketNumber).orElseThrow(
@@ -185,7 +191,7 @@ public class VehicleImpl implements IVehicleService {
                 closeTicket(tickets);
             }
             slotRepository.save(slot);
-            System.out.println("Ticket: " + tickets.getTicketNumber() + "has been expired and cloes!");
+            System.out.println("Ticket: " + tickets.getTicketNumber() + "has been expired and closed!");
         }
     }
 

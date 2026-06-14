@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { validateReservationDates } from "../utils/validation";
 import { getEndDateLimits } from "../utils/calendarValidation";
+// import TicketDashboard from "./TicketDashboard";
 
 export default function Slot() {
   const parkingLotId = 1;
@@ -160,9 +161,9 @@ export default function Slot() {
 
       setSlots(updated.data);
 
-      toast.success("Vehicle parked successfully");
+      toast.success("Ticket generated successfully!");
       setTimeout(() => {
-        navigate("/tickets");
+        navigate("/ticket-dashboard");
       }, 1500);
 
       // reset

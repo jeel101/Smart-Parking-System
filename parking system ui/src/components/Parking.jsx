@@ -6,6 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { unparkVehicle } from "../services/UnParkService";
 import { validateReservationDates } from "../utils/validation";
 import { getEndDateLimits } from "../utils/calendarValidation";
+import TicketDashboard from "./TicketDashboard";
 
 export default function Parking() {
   const [vehicleNumber, setVehicleNumber] = useState("");
@@ -62,7 +63,7 @@ export default function Parking() {
       console.log("before toast");
       toast.success("Ticket generated successfully!");
       setTimeout(() => {
-        navigate("/tickets");
+        navigate("/ticket-dashboard");
       }, 2000);
       console.log("after toast");
 
