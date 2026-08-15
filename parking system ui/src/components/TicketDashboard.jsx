@@ -47,22 +47,16 @@ export default function TicketDashboard() {
 
   return (
     <div className="min-h-screen bg-base">
-      {/* Brand bar — matches ParkingDashboard */}
-      <div className="bg-ink border-b border-black/10 px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-status-available animate-pulseDot" />
-            <h1 className="font-display text-lg font-bold text-white tracking-wide">
-              ParkWise <span className="text-sand">/ Tickets</span>
-            </h1>
-          </div>
-          <p className="text-xs text-white/50 font-mono uppercase tracking-widest">
+      <div className="max-w-5xl mx-auto p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+          <h1 className="font-display text-2xl font-bold text-dark">
+            Parking Tickets
+          </h1>
+          <p className="text-xs text-slate font-mono uppercase tracking-widest">
             Auto-refreshes every 30s
           </p>
         </div>
-      </div>
 
-      <div className="max-w-5xl mx-auto p-6">
         {/* Segmented tabs — same pattern as the reservation-type control on the slot map */}
         <div className="inline-flex rounded-lg border border-slate/15 bg-light p-1 mb-8 shadow-card">
           {TABS.map((tab) => (

@@ -1,33 +1,33 @@
-import { Outlet, Link } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Header from "./components/Header.jsx";
+import Footer from "./components/Footer.jsx";
 
 function App() {
   return (
-    <>
-      <div className="min-h-screen bg-base">
-        {/* Header */}
-        <div className="bg-primary text-black p-4 flex justify-between">
-          <h1 className="font-bold">Parking System</h1>
+    <div className="min-h-screen flex flex-col bg-base">
+      <Header />
 
-          <div className="flex gap-4">
-            <Link to="/admin">Admin</Link>
-            <Link to="/slots">User</Link>
-          </div>
-        </div>
+      <main className="flex-1">
+        <Outlet />
+      </main>
 
-        {/* Page Content */}
-        <ToastContainer>
-          theme="colored" position="top-centre" autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={true}
-          closeOnClick pauseOnHover draggable theme="light"
-        </ToastContainer>
-        <div className="p-6">
-          <Outlet />
-        </div>
-      </div>
-    </>
+      <Footer />
+
+      {/* These were being passed as plain text children before, which
+          does nothing — ToastContainer only reads them as props. */}
+      <ToastContainer
+        theme="colored"
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={true}
+        closeOnClick
+        pauseOnHover
+        draggable
+      />
+    </div>
   );
 }
 

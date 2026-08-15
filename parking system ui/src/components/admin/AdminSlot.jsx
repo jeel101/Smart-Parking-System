@@ -1,129 +1,123 @@
-import React from "react";
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import apiClient from "../../api/apiClient";
+import { toast } from "react-toastify";
 
-export default function Slot() {
-  const [floorId, setFloorId] = useState("");
-  const [totalSlots, setTotalSlots] = useState("");
-  const [floors, setFloors] = useState([]);
-  const [availableCount, setAvailableCount] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalSlotCount, setTotalSlotCount] = useState(0);
+// NOTE: I don't have your FloorController, only FloorImpl (the service layer),
+// so I can't confirm the exact REST path for creating a floor. GET
+// `/floor/parking-lot/{id}` is already proven to work (you use it in AdminSlot
+// and Slot). For POST I've assumed `/floor/add/{parkingLotId}` — check your
+// controller and adjust the one line marked below if the path differs.
+
+export default function AdminFloor() {
   const parkingLotId = 1;
+  const [floors, setFloors] = useState([]);
+  const [floorStats, setFloorStats] = useState({}); // { [floorId]: { available, total } }
+  const [loading, setLoading] = useState(false);
 
-  const handleCreateSlots = async () => {
-    await apiClient.post(
-      `/slot/create-slot/${floorId}?totalSlots=${totalSlots}`,
-    );
-    alert("Slots created!");
+  const fetchFloors = async () => {
+    try {
+      const res = await apiClient.get(`/floor/parking-lot/${parkingLotId}`);
+      setFloors(res.data);
+
+      const statsEntries = await Promise.all(
+        res.data.map(async (floor) => {
+          try {
+            const [availableRes, totalRes] = await Promise.all([
+              apiClient.get(`/slot/floor/${floor.id}/available/count`),
+              apiClient.get(`/slot/floor/${floor.id}/count`),
+            ]);
+            return [
+              floor.id,
+              { available: availableRes.data, total: totalRes.data },
+            ];
+          } catch {
+            return [floor.id, { available: 0, total: 0 }];
+          }
+        }),
+      );
+      setFloorStats(Object.fromEntries(statsEntries));
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load floors");
+    }
   };
 
-  // fetch floors
-  useEffect(() => { 
-    const fetchFloors = async () => {
-      try {
-        const res = await apiClient.get(`/floor/parking-lot/${parkingLotId}`);
-        setFloors(res.data);
-      } catch (err) {
-        console.log("floors:", floors);
-        console.error(err);
-      }
-    };
+  useEffect(() => {
     fetchFloors();
   }, []);
 
-  //fetch count of all slots within parking lot
-  useEffect(() => {
-    const fetchTotalParkingSlots = async () => {
-      try {
-        const res = await apiClient.get(
-          `/slot/parking-lot/${parkingLotId}/count`,
-        );
-        setTotalSlotCount(res.data);
-      } catch (err) {
-        console.error("total parking lot error:", err);
-      }
-    };
-
-    fetchTotalParkingSlots();
-  }, []);
-
-  useEffect(() => {
-    if (!floorId) return;
-    const fetchSlotData = async () => {
-      try {
-        const [availableCountRes, totalRes] = await Promise.all([
-          apiClient.get(`/slot/floor/${floorId}/available/count`), //count of all available slots within floor
-          apiClient.get(`/slot/floor/${floorId}/count`), //count all slots within floor
-        ]);
-
-        setAvailableCount(availableCountRes.data);
-        setTotalCount(totalRes.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
-    fetchSlotData();
-  }, [floorId]);
+  const handleAddFloor = async () => {
+    setLoading(true);
+    try {
+      // ⚠ confirm this path against your FloorController
+      await apiClient.post(`/floor/add/${parkingLotId}`);
+      toast.success("Floor added!");
+      fetchFloors();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to add floor");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-base flex flex-col items-center p-8 gap-8">
-      {/* Create Slots Card */}
-      <div className="bg-light p-8 rounded-2xl shadow-md border w-full max-w-md">
-        <h2 className="text-2xl font-bold text-dark text-center mb-6">
-          Create Slots
-        </h2>
-
-        <div className="space-y-4">
-          <select
-            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent"
-            value={floorId}
-            onChange={(e) => setFloorId(e.target.value)}
-          >
-            <option value="">Select Floor</option>
-            {floors.map((floor) => (
-              <option key={floor.id} value={floor.id}>
-                Floor {floor.floorNum}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="number"
-            min="1"
-            value={totalSlots}
-            onChange={(e) => setTotalSlots(e.target.value)}
-            placeholder="Total Slots"
-            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-accent"
-          />
-
+    <div className="min-h-screen bg-base p-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="bg-ink rounded-2xl px-6 py-5 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <p className="font-display text-xs tracking-[0.25em] text-sand/80 uppercase">
+              Admin / Parking Lot {parkingLotId}
+            </p>
+            <h2 className="font-display text-2xl font-bold text-white">
+              Floor Management
+            </h2>
+          </div>
           <button
-            className="w-full bg-primary text-black py-2 rounded-lg hover:bg-accent"
-            onClick={handleCreateSlots}
+            onClick={handleAddFloor}
+            disabled={loading}
+            className="bg-clay text-white font-display font-semibold px-5 py-2.5 rounded-lg hover:bg-sand hover:text-ink transition disabled:opacity-50"
           >
-            Create Slots
+            {loading ? "Adding…" : "+ Add Floor"}
           </button>
         </div>
-      </div>
 
-      {/* Stats Section */}
-      {floorId && (
-        <div className="flex gap-8 items-center">
-          {/* Ratio Box */}
-          <div className="bg-primary p-6 rounded-xl shadow-md w-56 text-center">
-            <p className="text-3xl font-bold">
-              {availableCount} / {totalCount}
-            </p>
-            <p className="text-sm mt-2">Available / Total</p>
-          </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {floors.map((floor) => {
+            const stats = floorStats[floor.id] || { available: 0, total: 0 };
+            return (
+              <div
+                key={floor.id}
+                className="bg-light rounded-2xl p-5 shadow-card border border-slate/10 flex items-center justify-between"
+              >
+                <div>
+                  <p className="text-xs text-slate uppercase tracking-wide">
+                    Floor
+                  </p>
+                  <p className="font-display text-xl font-bold text-dark">
+                    F{floor.floorNum}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-mono text-lg font-semibold text-clay">
+                    {stats.available}/{stats.total}
+                  </p>
+                  <p className="text-xs text-slate">available / total</p>
+                </div>
+              </div>
+            );
+          })}
+
+          {floors.length === 0 && (
+            <div className="sm:col-span-2 text-center py-16 bg-light rounded-2xl border border-dashed border-slate/20">
+              <p className="font-display font-semibold text-dark">
+                No floors yet
+              </p>
+              <p className="text-sm text-slate mt-1">
+                Add your first floor to start creating slots.
+              </p>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* Details Box */}
-      <div className="bg-light p-6 rounded-xl shadow-md w-56 text-center border border-accent">
-        <p className="text-sm text-dark mb-2">Total Slots</p>
-        <p className="text-3xl font-bold text-accent">{totalSlotCount}</p>
       </div>
     </div>
   );

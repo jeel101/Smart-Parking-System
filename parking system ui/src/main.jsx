@@ -1,9 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./theme.css";
-import App from "./App.jsx";
 import "./index.css";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import App from "./App.jsx";
+import Login from "./components/Login.jsx";
 import AdminSlot from "./components/admin/AdminSlot.jsx";
 import Slot from "./components/Slot.jsx";
 import Parking from "./components/Parking.jsx";
@@ -13,8 +14,16 @@ import TicketDashboard from "./components/TicketDashboard.jsx";
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <App />,
+    element: <App />, // Header + Outlet + Footer + ToastContainer now live here
     children: [
+      {
+        path: "/",
+        element: <Login />,
+      },
+      {
+        path: "/login",
+        element: <Login />,
+      },
       {
         path: "/admin",
         element: <AdminSlot />,
