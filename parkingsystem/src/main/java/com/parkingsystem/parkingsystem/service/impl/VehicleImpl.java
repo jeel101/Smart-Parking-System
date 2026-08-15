@@ -244,6 +244,19 @@ public class VehicleImpl implements IVehicleService {
         System.out.println("BOOKING TYPE = " + bookingType);
         System.out.println("START = " + startTime);
         System.out.println("END = " + endTime);
+
+        // prevent duplicate parking
+        boolean alreadyParked = ticketRepository.existsByVehicleAndStatus(vehicle, TicketStatus.OPEN);
+
+        if (alreadyParked) {
+            throw new RuntimeException("Vehicle already parked");
+        }
+
+        //check for vehicle and slot type to be same
+        if(vehicle.getVehicleType() !=slot.getSlotType()) {
+            throw new RuntimeException("Vehicle type does not match slot type");
+        }
+
         // reservation check
         boolean instantBooking = bookingType.equals("INSTANT");
 
@@ -262,11 +275,6 @@ public class VehicleImpl implements IVehicleService {
         if(overlapping) {
             throw new RuntimeException("Slot already booked for selected time");
         }
-        if (overlapping) {
-            throw new RuntimeException(
-                    "Slot already booked for selected time"
-            );
-        }
 
         // validate dates only for reservation
         if (!instantBooking) {
@@ -279,12 +287,7 @@ public class VehicleImpl implements IVehicleService {
             }
         }
 
-        // prevent duplicate parking
-        boolean alreadyParked = ticketRepository.existsByVehicleAndStatus(vehicle, TicketStatus.OPEN);
 
-        if (alreadyParked) {
-            throw new RuntimeException("Vehicle already parked");
-        }
 
         slotRepository.save(slot);
 
