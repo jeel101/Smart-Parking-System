@@ -2,6 +2,7 @@ import React from "react";
 import TicketCard from "./TicketCard";
 import { toast } from "react-toastify";
 import { unparkVehicle } from "../services/UnParkService";
+import EmptyState from "./EmptyState";
 
 export default function OpenTickets({ tickets, refreshTickets }) {
   const handleUnpark = async (ticketNumber) => {
@@ -15,11 +16,11 @@ export default function OpenTickets({ tickets, refreshTickets }) {
   };
 
   if (!tickets.length) {
-    return <p>No Open Tickets</p>;
+    return <EmptyState label="No open tickets" hint="Vehicles you park will show up here." />;
   }
 
   return (
-    <div className="grid gap-6 max-w-5xl mx-auto">
+    <div className="grid gap-4">
       {tickets.map((ticket) => (
         <TicketCard
           key={ticket.ticketNumber}

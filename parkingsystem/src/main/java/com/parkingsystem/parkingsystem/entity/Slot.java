@@ -29,4 +29,7 @@ public class Slot {
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "floor_id", nullable = false)
     private Floor floor;
+
+    @Version
+    private Long version;
 }

@@ -82,7 +82,7 @@ public class SlotImpl implements ISlotService{
 
     @Override
     @Cacheable(value = "slotAvailability",
-                key = "#floorId")
+                key = "#floorId + ' ' + #startTime + '_' + #endTime")
     public List<SlotAvailabilityDto> getAvailableSlots(Long floorId, LocalDateTime startTime, LocalDateTime endTime) {
         List<Slot> allSlots = slotRepository.findByFloor_Id(floorId);
         List<SlotAvailabilityDto> result = new ArrayList<>();

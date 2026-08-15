@@ -5,7 +5,26 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { validateReservationDates } from "../utils/validation";
 import { getEndDateLimits } from "../utils/calendarValidation";
-// import TicketDashboard from "./TicketDashboard";
+
+const RESERVATION_TYPES = ["INSTANT", "DAILY", "WEEKLY", "MONTHLY"];
+
+const STATUS_STYLES = {
+  AVAILABLE: {
+    card: "bg-status-available/10 border-status-available/40 hover:border-status-available cursor-pointer hover:-translate-y-0.5",
+    dot: "bg-status-available animate-pulseDot",
+    label: "text-status-available",
+  },
+  RESERVED: {
+    card: "bg-status-reserved/10 border-status-reserved/40 cursor-not-allowed opacity-90",
+    dot: "bg-status-reserved",
+    label: "text-[#8a6d00]",
+  },
+  OCCUPIED: {
+    card: "bg-status-occupied/10 border-status-occupied/40 cursor-not-allowed opacity-90",
+    dot: "bg-status-occupied",
+    label: "text-status-occupied",
+  },
+};
 
 export default function Slot() {
   const parkingLotId = 1;
@@ -13,7 +32,7 @@ export default function Slot() {
   const [floorId, setFloorId] = useState("");
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  // form fields
+
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [reservationType, setReservationType] = useState("INSTANT");
   const [startTime, setStartTime] = useState("");
@@ -25,10 +44,7 @@ export default function Slot() {
     const fetchFloors = async () => {
       try {
         const res = await apiClient.get(`/slot/parking-lot/${parkingLotId}`);
-
         setFloors(res.data);
-
-        // auto select first floor
         if (res.data.length > 0) {
           setFloorId(res.data[0].id);
         }
@@ -39,11 +55,15 @@ export default function Slot() {
     fetchFloors();
   }, []);
 
-  // Fetch slots when floor changes
+  const formatLocalDateTime = (date) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  };
+
+  // Fetch slots when floor / dates / reservation type changes
   useEffect(() => {
     if (!floorId) return;
 
-    // reservation bookings must first select dates
     if (reservationType !== "INSTANT" && (!startTime || !endTime)) {
       setSlots([]);
       return;
@@ -52,8 +72,6 @@ export default function Slot() {
     const fetchSlots = async () => {
       try {
         let res;
-
-        // reservation bookings
         if (reservationType !== "INSTANT") {
           res = await apiClient.get(`/slot/available`, {
             params: {
@@ -62,23 +80,17 @@ export default function Slot() {
               endTime: `${endTime}T00:00:00`,
             },
           });
-        }
-
-        // instant bookings
-        else {
+        } else {
           const now = new Date();
           const oneMinuteLater = new Date(Date.now() + 60000);
-
           res = await apiClient.get(`/slot/available`, {
             params: {
               floorId,
-              //send current time
               startTime: formatLocalDateTime(now),
-              endTime: formatLocalDateTime(oneMinuteLater), // +1 min
+              endTime: formatLocalDateTime(oneMinuteLater),
             },
           });
         }
-
         setSlots(res.data);
       } catch (err) {
         console.error(err);
@@ -95,24 +107,38 @@ export default function Slot() {
     return null;
   };
 
-  //local date time for instant booking validation
-  const formatLocalDateTime = (date) => {
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  // ---- Requirement 5: when start date changes, re-validate/auto-correct end date ----
+  const handleStartTimeChange = (newStart) => {
+    setStartTime(newStart);
+
+    const limits = getEndDateLimits(reservationType, newStart);
+
+    // if there's no end date yet, or the existing end date no longer
+    // falls inside the allowed window for the new start date, snap it
+    // to the nearest valid value instead of leaving a stale/invalid date.
+    if (!endTime) return;
+
+    const endDate = new Date(endTime);
+    const minDate = limits.min ? new Date(limits.min) : null;
+    const maxDate = limits.max ? new Date(limits.max) : null;
+
+    const isBelowMin = minDate && endDate < minDate;
+    const isAboveMax = maxDate && endDate > maxDate;
+
+    if (isBelowMin || isAboveMax) {
+      setEndTime(limits.min || "");
+    }
   };
 
-  // park by selected slot
   const handleParkBySlot = async () => {
     if (!selectedSlot) {
       toast.error("Please select a slot");
       return;
     }
-
     if (!vehicleNumber) {
       toast.error("Enter vehicle number");
       return;
     }
-    //dates validatrion for reservation
     if (!validateReservationDates(reservationType, startTime, endTime)) return;
 
     try {
@@ -125,31 +151,22 @@ export default function Slot() {
         endTime: reservationType !== "INSTANT" ? `${endTime}T00:00:00` : null,
       });
 
-      // save ticket
       const oldTickets = JSON.parse(localStorage.getItem("tickets")) || [];
-
       oldTickets.push(res.data);
-
       localStorage.setItem("tickets", JSON.stringify(oldTickets));
 
-      //refresh slots
       let updated;
-
       if (reservationType !== "INSTANT" && startTime && endTime) {
         updated = await apiClient.get(`/slot/available`, {
           params: {
             floorId,
-
             startTime: `${startTime}T00:00:00`,
-
             endTime: `${endTime}T00:00:00`,
           },
         });
-      } // CHANGED: instant booking refresh
-      else {
+      } else {
         const now = new Date();
         const oneMinuteLater = new Date(Date.now() + 60000);
-
         updated = await apiClient.get(`/slot/available`, {
           params: {
             floorId,
@@ -160,196 +177,249 @@ export default function Slot() {
       }
 
       setSlots(updated.data);
-
       toast.success("Ticket generated successfully!");
-      setTimeout(() => {
-        navigate("/ticket-dashboard");
-      }, 1500);
+      setTimeout(() => navigate("/ticket-dashboard"), 1500);
 
-      // reset
       setVehicleNumber("");
       setSelectedSlot(null);
-      // setStartTime("");
-      // setEndTime("");
     } catch (err) {
       toast.error(err.response?.data?.message || "Parking failed");
     }
   };
 
+  const availableCount = slots.filter((s) => s.reason === "AVAILABLE").length;
+
   return (
-    <div className="min-h-screen bg-base p-8 max-w-6xl mx-auto">
-      {/* TITLE */}
+    <div className="bg-light rounded-2xl shadow-card border border-slate/10 overflow-hidden">
+      {/* ===== SIGNAGE HEADER ===== */}
+      <div className="bg-ink text-base px-6 py-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="font-display text-xs tracking-[0.25em] text-sand/80 uppercase">
+            Parking Lot {parkingLotId}
+          </p>
+          <h2 className="font-display text-2xl font-bold text-white">
+            Live Slot Map
+          </h2>
+        </div>
 
-      <h2 className="text-3xl font-bold mb-6">Parking Lot {parkingLotId}</h2>
-
-      {/* FILTERS */}
-      <div className="flex flex-wrap gap-4 mb-8 items-center">
-        {/* FLOOR */}
-        <select
-          value={floorId}
-          onChange={(e) => setFloorId(e.target.value)}
-          className="p-3 border rounded-lg shadow-sm"
-        >
-          {floors.map((floor) => (
-            <option key={floor.id} value={floor.id}>
-              Floor {floor.floorNum}
-            </option>
-          ))}
-        </select>
-
-        {/* RESERVATION TYPE */}
-        <select
-          value={reservationType}
-          onChange={(e) => {
-            setReservationType(e.target.value);
-
-            // reset dates
-            setStartTime("");
-            setEndTime("");
-
-            // clear slots temporarily
-            setSlots([]);
-          }}
-          className="p-3 border rounded-lg"
-        >
-          <option value="INSTANT">INSTANT</option>
-
-          <option value="DAILY">DAILY</option>
-
-          <option value="WEEKLY">WEEKLY</option>
-
-          <option value="MONTHLY">MONTHLY</option>
-        </select>
-
-        {/* DATES */}
-        {reservationType !== "INSTANT" && (
-          <>
-            {/* START DATE */}
-            <input
-              type="date"
-              value={startTime}
-              min={new Date().toISOString().split("T")[0]}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="p-3 border rounded-lg"
-            />
-
-            {/* END DATE */}
-            <input
-              type="date"
-              value={endTime}
-              min={getEndDateLimits(reservationType, startTime).min}
-              max={getEndDateLimits(reservationType, startTime).max}
-              onChange={(e) => setEndTime(e.target.value)}
-              className="p-3 border rounded-lg"
-            />
-          </>
-        )}
+        {/* LED-style availability readout */}
+        <div className="font-mono bg-black/25 border border-white/10 rounded-lg px-4 py-2 text-right">
+          <span className="text-3xl font-semibold text-status-available leading-none">
+            {String(availableCount).padStart(2, "0")}
+          </span>
+          <p className="text-[10px] tracking-widest text-white/60 uppercase mt-0.5">
+            open on this floor
+          </p>
+        </div>
       </div>
 
-      {/* SLOTS GRID */}
+      {/* ===== CONTROLS ===== */}
+      <div className="px-6 pt-5 pb-4 border-b border-slate/10 space-y-4">
+        {/* Floor pills */}
+        <div className="flex flex-wrap gap-2">
+          {floors.map((floor) => (
+            <button
+              key={floor.id}
+              onClick={() => setFloorId(floor.id)}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold font-display transition
+                ${
+                  String(floorId) === String(floor.id)
+                    ? "bg-clay text-white shadow-sm"
+                    : "bg-base text-dark/70 border border-slate/15 hover:border-clay/50"
+                }`}
+            >
+              Floor {floor.floorNum}
+            </button>
+          ))}
+        </div>
 
-      <div className="grid grid-cols-5 gap-5">
+        {/* Reservation segmented control */}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="inline-flex rounded-lg border border-slate/15 bg-base p-1">
+            {RESERVATION_TYPES.map((type) => (
+              <button
+                key={type}
+                onClick={() => {
+                  setReservationType(type);
+                  setStartTime("");
+                  setEndTime("");
+                  setSlots([]);
+                }}
+                className={`px-3.5 py-1.5 text-xs font-semibold font-display rounded-md transition
+                  ${
+                    reservationType === type
+                      ? "bg-ink text-white shadow-sm"
+                      : "text-dark/60 hover:text-dark"
+                  }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+
+          {/* Requirement 4: visual shift when a reservation (non-instant) type is selected */}
+          {reservationType !== "INSTANT" && (
+            <div className="flex items-center gap-2 animate-[fadeIn_0.2s_ease]">
+              <input
+                type="date"
+                value={startTime}
+                min={new Date().toISOString().split("T")[0]}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
+                className="p-2 text-sm border border-clay/40 bg-sand/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-clay/40"
+              />
+              <span className="text-slate text-sm">→</span>
+              <input
+                type="date"
+                value={endTime}
+                min={getEndDateLimits(reservationType, startTime).min}
+                max={getEndDateLimits(reservationType, startTime).max}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="p-2 text-sm border border-clay/40 bg-sand/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-clay/40"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Legend */}
+        <div className="flex items-center gap-5 pt-1">
+          {[
+            ["Available", "status-available"],
+            ["Reserved", "status-reserved"],
+            ["Occupied", "status-occupied"],
+          ].map(([label, color]) => (
+            <div
+              key={label}
+              className="flex items-center gap-1.5 text-xs text-dark/60 font-medium"
+            >
+              <span className={`w-2.5 h-2.5 rounded-full bg-${color}`} />
+              {label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== SLOT GRID ===== */}
+      <div className="p-6">
         {slots.length === 0 && reservationType !== "INSTANT" && (
-          <p className="text-lg">Select dates to view available slots</p>
+          <div className="text-center py-16 text-slate">
+            <p className="font-display font-semibold">Select a date range</p>
+            <p className="text-sm mt-1">
+              Available slots for your dates will appear here.
+            </p>
+          </div>
         )}
 
-        {/* CHANGED: no slots available */}
         {reservationType !== "INSTANT" &&
           startTime &&
           endTime &&
           slots.length === 0 && (
-            <p className="text-lg text-red-500">
-              No slots available for selected dates
-            </p>
+            <div className="text-center py-16">
+              <p className="font-display font-semibold text-status-occupied">
+                No slots available for these dates
+              </p>
+              <p className="text-sm text-slate mt-1">
+                Try a different date range or floor.
+              </p>
+            </div>
           )}
 
-        {slots.map((slot) => {
-          const isAvailable = slot.available;
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
+          {slots.map((slot) => {
+            const style = STATUS_STYLES[slot.reason] || STATUS_STYLES.OCCUPIED;
+            const isSelected = selectedSlot?.slotId === slot.slotId;
 
-          return (
-            <div
-              key={slot.slotId}
-              onClick={() => slot.available && setSelectedSlot(slot)}
-              className={`
-                w-28 h-28 rounded-xl border shadow-md
-                flex flex-col items-center justify-center
-                transition
-                ${
-                  // CHANGED: available slot
-                  slot.reason === "AVAILABLE"
-                    ? "bg-[#08CB00] cursor-pointer hover:scale-105"
-                    : slot.reason === "RESERVED"
-                      ? "bg-[#FFD700] opacity-90 cursor-not-allowed"
-                      : "bg-[#FF3737] opacity-90 cursor-not-allowed"
-                }
-              `}
-            >
-              {/* ICON */}
-              <div className="text-xl mb-2">{getIcon(slot.slotType)}</div>
+            return (
+              <div
+                key={slot.slotId}
+                onClick={() => slot.available && setSelectedSlot(slot)}
+                className={`relative rounded-xl border-2 bg-light transition-all duration-150
+                  ${style.card}
+                  ${isSelected ? "ring-2 ring-clay ring-offset-2 ring-offset-light" : ""}
+                `}
+              >
+                <div className="flex flex-col items-center justify-center pt-4 pb-3">
+                  <span className={`w-2 h-2 rounded-full mb-2 ${style.dot}`} />
+                  <div className="text-xl text-dark/80">
+                    {getIcon(slot.slotType)}
+                  </div>
+                  <p className="font-mono font-semibold text-sm mt-1 text-dark">
+                    {slot.slotNum}
+                  </p>
+                </div>
 
-              {/* SLOT NUMBER */}
-              <p className="text-sm font-semibold">{slot.slotNum}</p>
+                {/* ticket-stub perforated divider */}
+                <div className="border-t border-dashed border-slate/25 mx-3" />
 
-              {/* STATUS */}
-              <p className="text-xs font-medium">{slot.reason}</p>
-            </div>
-          );
-        })}
+                <p
+                  className={`text-[11px] font-display font-bold tracking-wide text-center py-2 ${style.label}`}
+                >
+                  {slot.reason}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* ============================================ */}
-      {/* MODAL */}
-      {/* ============================================ */}
-
+      {/* ===== CONFIRM MODAL ===== */}
       {selectedSlot && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-5">Park by Selected Slot</h2>
+        <div className="fixed inset-0 bg-ink/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-light rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="bg-ink px-6 py-4">
+              <h2 className="font-display text-xl font-bold text-white">
+                Confirm Parking
+              </h2>
+            </div>
 
-            <div className="space-y-4">
-              <p>
-                <strong>Selected Slot:</strong> {selectedSlot.slotNum}
-              </p>
-
-              <p>
-                <strong>Vehicle Type:</strong> {selectedSlot.slotType}
-              </p>
-
-              <p>
-                <strong>Reservation:</strong> {reservationType}
-              </p>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between bg-base rounded-lg px-4 py-3 border border-slate/10">
+                <div>
+                  <p className="text-xs text-slate uppercase tracking-wide">
+                    Slot
+                  </p>
+                  <p className="font-mono font-semibold text-dark">
+                    {selectedSlot.slotNum}
+                  </p>
+                </div>
+                <div className="text-2xl text-clay">
+                  {getIcon(selectedSlot.slotType)}
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate uppercase tracking-wide">
+                    Type
+                  </p>
+                  <p className="font-semibold text-dark">{reservationType}</p>
+                </div>
+              </div>
 
               {reservationType !== "INSTANT" && (
-                <p>
-                  <strong>Dates:</strong> {startTime} → {endTime}
+                <p className="text-sm text-dark/70">
+                  <strong className="text-dark">Dates:</strong> {startTime} →{" "}
+                  {endTime}
                 </p>
               )}
 
-              {/* VEHICLE NUMBER */}
               <input
                 type="text"
                 placeholder="Vehicle Number"
                 value={vehicleNumber}
                 onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
-                className="w-full p-3 border rounded-lg"
+                className="w-full p-3 border border-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-clay/40"
               />
 
-              {/* BUTTONS */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-1">
                 <button
                   onClick={handleParkBySlot}
-                  className="flex-1 bg-primary py-3 rounded-lg hover:bg-accent"
+                  className="flex-1 bg-clay text-white font-semibold py-3 rounded-lg hover:bg-ink transition"
                 >
                   Confirm
                 </button>
-
                 <button
                   onClick={() => {
                     setSelectedSlot(null);
-
                     setVehicleNumber("");
                   }}
-                  className="flex-1 bg-gray-300 py-3 rounded-lg hover:bg-gray-400"
+                  className="flex-1 bg-base text-dark font-semibold py-3 rounded-lg border border-slate/15 hover:bg-slate/10 transition"
                 >
                   Cancel
                 </button>

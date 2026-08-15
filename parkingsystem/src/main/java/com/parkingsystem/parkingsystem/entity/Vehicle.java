@@ -17,7 +17,7 @@ public class Vehicle {
     @Column(name = "vehicle_id", nullable = false)
     private Long id;
 
-    @Column(name = "vehicle_number", nullable = false)
+    @Column(name = "vehicle_number", nullable = false, unique = true)
     private String vehicleNumber;
 
     @Enumerated(EnumType.STRING)

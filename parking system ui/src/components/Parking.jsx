@@ -6,21 +6,22 @@ import "react-toastify/dist/ReactToastify.css";
 import { unparkVehicle } from "../services/UnParkService";
 import { validateReservationDates } from "../utils/validation";
 import { getEndDateLimits } from "../utils/calendarValidation";
-import TicketDashboard from "./TicketDashboard";
 
 export default function Parking() {
+  const [mode, setMode] = useState("park"); // "park" | "unpark"
+
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [vehicleType, setVehicleType] = useState("CAR");
-  const [ticketNumber, setTicketNumber] = useState("");
   const [reservationType, setReservationType] = useState("INSTANT");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [unparkError, setUnparkError] = useState("");
   const [errors, setErrors] = useState({});
-  const navigate = useNavigate();
-  // const parkingLotId = 1; // or dynamic later
 
-  //validation for vehicle number
+  const [ticketNumber, setTicketNumber] = useState("");
+  const [unparkError, setUnparkError] = useState("");
+
+  const navigate = useNavigate();
+
   const validate = () => {
     const newErrors = {};
     const regex = /^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/;
@@ -35,14 +36,25 @@ export default function Parking() {
     return Object.keys(newErrors).length === 0;
   };
 
-  //park
+  // Requirement 5: auto-correct end date whenever start date changes
+  const handleStartTimeChange = (newStart) => {
+    setStartTime(newStart);
+
+    const limits = getEndDateLimits(reservationType, newStart);
+    if (!endTime) return;
+
+    const endDate = new Date(endTime);
+    const minDate = limits.min ? new Date(limits.min) : null;
+    const maxDate = limits.max ? new Date(limits.max) : null;
+
+    if ((minDate && endDate < minDate) || (maxDate && endDate > maxDate)) {
+      setEndTime(limits.min || "");
+    }
+  };
+
   const handlePark = async () => {
     if (!validate()) return;
-
-    //dates validatrion for reservation
-    if (!validateReservationDates(reservationType, startTime, endTime)) {
-      return;
-    }
+    if (!validateReservationDates(reservationType, startTime, endTime)) return;
 
     try {
       const res = await apiClient.post("/vehicle/park", {
@@ -53,28 +65,20 @@ export default function Parking() {
           reservationType !== "INSTANT" ? `${startTime}T00:00:00` : null,
         endTime: reservationType !== "INSTANT" ? `${endTime}T00:00:00` : null,
       });
-      console.log(res.data);
 
-      // store in localStorage
       const oldTickets = JSON.parse(localStorage.getItem("tickets")) || [];
       oldTickets.push(res.data);
       localStorage.setItem("tickets", JSON.stringify(oldTickets));
 
-      console.log("before toast");
       toast.success("Ticket generated successfully!");
-      setTimeout(() => {
-        navigate("/ticket-dashboard");
-      }, 2000);
-      console.log("after toast");
+      setTimeout(() => navigate("/ticket-dashboard"), 2000);
 
-      // reset
       setVehicleNumber("");
     } catch (err) {
       toast.error(err.response?.data?.message || "Error parking vehicle");
     }
   };
 
-  //unpark
   const handleUnpark = async () => {
     if (!ticketNumber) {
       setUnparkError("Enter ticket number");
@@ -83,9 +87,7 @@ export default function Parking() {
 
     try {
       const message = await unparkVehicle(ticketNumber);
-
       toast.success(message);
-
       setTimeout(() => {
         setTicketNumber("");
         setUnparkError("");
@@ -96,103 +98,156 @@ export default function Parking() {
   };
 
   return (
-    <div className="min-h-screen bg-base flex items-center justify-center p-6">
-      <div className="bg-light p-8 rounded-2xl shadow-md w-full max-w-lg space-y-6">
-        <h2 className="text-2xl font-bold text-dark text-center">
-          Parking System
+    <div className="bg-light rounded-2xl shadow-card border border-slate/10 overflow-hidden sticky top-6">
+      {/* Header */}
+      <div className="bg-ink px-6 py-5">
+        <p className="font-display text-xs tracking-[0.25em] text-sand/80 uppercase">
+          Attendant Desk
+        </p>
+        <h2 className="font-display text-xl font-bold text-white">
+          Manual Booking
         </h2>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-slate/10">
+        {[
+          ["park", "Park Vehicle"],
+          ["unpark", "Unpark Vehicle"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setMode(key)}
+            className={`flex-1 py-3 text-sm font-display font-semibold transition
+              ${
+                mode === key
+                  ? "text-clay border-b-2 border-clay bg-sand/5"
+                  : "text-dark/50 hover:text-dark"
+              }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-6">
         {/* ========= PARK ========= */}
-        <div className="space-y-4 border-b pb-6">
-          <input
-            type="text"
-            placeholder="Vehicle Number"
-            value={vehicleNumber}
-            onChange={(e) => {
-              setVehicleNumber(e.target.value.toUpperCase());
-              setErrors({ ...errors, vehicleNumber: "" });
-            }}
-            className={`w-full p-2 border rounded-lg ${
-              errors.vehicleNumber ? "border-red-500" : "border-gray-300"
-            }`}
-          />
-          {errors.vehicleNumber && (
-            <p className="text-red-500 text-sm">{errors.vehicleNumber}</p>
-          )}
-          <select
-            value={vehicleType}
-            onChange={(e) => setVehicleType(e.target.value)}
-            className="w-full p-2 border rounded-lg"
-          >
-            <option value="CAR">CAR</option>
-            <option value="BIKE">BIKE</option>
-            <option value="TRUCK">TRUCK</option>
-          </select>
-          {/* dropwdown for reservation type */}
-          <select
-            value={reservationType}
-            onChange={(e) => setReservationType(e.target.value)}
-            className="w-full p-2 border rounded-lg"
-          >
-            <option value="INSTANT">INSTANT</option>
-            <option value="DAILY">DAILY</option>
-            <option value="WEEKLY">WEEKLY</option>
-            <option value="MONTHLY">MONTHLY</option>
-          </select>
-
-          {/* calendar for start and end time if reservation type is not instant */}
-          {reservationType !== "INSTANT" && (
-            <>
+        {mode === "park" && (
+          <div className="space-y-4">
+            <div>
               <input
-                type="date"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full p-2 border rounded-lg"
+                type="text"
+                placeholder="Vehicle Number"
+                value={vehicleNumber}
+                onChange={(e) => {
+                  setVehicleNumber(e.target.value.toUpperCase());
+                  setErrors({ ...errors, vehicleNumber: "" });
+                }}
+                className={`w-full p-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-clay/40 ${
+                  errors.vehicleNumber
+                    ? "border-status-occupied"
+                    : "border-slate/20"
+                }`}
               />
+              {errors.vehicleNumber && (
+                <p className="text-status-occupied text-xs mt-1">
+                  {errors.vehicleNumber}
+                </p>
+              )}
+            </div>
 
+            <select
+              value={vehicleType}
+              onChange={(e) => setVehicleType(e.target.value)}
+              className="w-full p-2.5 border border-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-clay/40"
+            >
+              <option value="CAR">CAR</option>
+              <option value="BIKE">BIKE</option>
+              <option value="TRUCK">TRUCK</option>
+            </select>
+
+            <select
+              value={reservationType}
+              onChange={(e) => {
+                setReservationType(e.target.value);
+                setStartTime("");
+                setEndTime("");
+              }}
+              className="w-full p-2.5 border border-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-clay/40"
+            >
+              <option value="INSTANT">INSTANT</option>
+              <option value="DAILY">DAILY</option>
+              <option value="WEEKLY">WEEKLY</option>
+              <option value="MONTHLY">MONTHLY</option>
+            </select>
+
+            {/* Requirement 4: reservation dates get a distinct highlighted panel */}
+            {reservationType !== "INSTANT" && (
+              <div className="space-y-3 bg-sand/10 border border-clay/20 rounded-lg p-3 animate-[fadeIn_0.2s_ease]">
+                <p className="text-xs font-display font-semibold text-clay uppercase tracking-wide">
+                  Reservation Window
+                </p>
+                <input
+                  type="date"
+                  value={startTime}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => handleStartTimeChange(e.target.value)}
+                  className="w-full p-2.5 border border-clay/30 rounded-lg bg-light focus:outline-none focus:ring-2 focus:ring-clay/40"
+                />
+                <input
+                  type="date"
+                  value={endTime}
+                  min={getEndDateLimits(reservationType, startTime).min}
+                  max={getEndDateLimits(reservationType, startTime).max}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full p-2.5 border border-clay/30 rounded-lg bg-light focus:outline-none focus:ring-2 focus:ring-clay/40"
+                />
+                {errors.date && (
+                  <p className="text-status-occupied text-xs">{errors.date}</p>
+                )}
+              </div>
+            )}
+
+            <button
+              onClick={handlePark}
+              className="w-full bg-clay text-white font-display font-semibold py-3 rounded-lg hover:bg-ink transition"
+            >
+              Park Vehicle
+            </button>
+          </div>
+        )}
+
+        {/* ========= UNPARK ========= */}
+        {mode === "unpark" && (
+          <div className="space-y-4">
+            <div>
               <input
-                type="date"
-                value={endTime}
-                min={getEndDateLimits(reservationType, startTime).min}
-                max={getEndDateLimits(reservationType, startTime).max}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full p-2 border rounded-lg"
+                type="text"
+                placeholder="Ticket Number"
+                value={ticketNumber}
+                onChange={(e) => {
+                  setTicketNumber(e.target.value);
+                  setUnparkError("");
+                }}
+                className={`w-full p-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-clay/40 ${
+                  unparkError ? "border-status-occupied" : "border-slate/20"
+                }`}
               />
-            </>
-          )}
+              {unparkError && (
+                <p className="text-status-occupied text-xs mt-1">
+                  {unparkError}
+                </p>
+              )}
+            </div>
 
-          <button
-            onClick={handlePark}
-            className="w-full bg-primary py-2 rounded-lg hover:bg-accent cursor-pointer"
-          >
-            Park Vehicle
-          </button>
-        </div>
-        //unpark
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-dark">Unpark Vehicle</h3>
-
-          <input
-            type="text"
-            placeholder="Ticket Number"
-            value={ticketNumber}
-            onChange={(e) => {
-              setTicketNumber(e.target.value);
-              setUnparkError("");
-            }}
-            className={`w-full p-2 border rounded-lg ${
-              unparkError ? "border-red-500" : "border-gray-300"
-            }`}
-          />
-
-          {unparkError && <p className="text-red-500 text-sm">{unparkError}</p>}
-
-          <button
-            onClick={handleUnpark}
-            className="w-full bg-dark text-black py-2 rounded-lg hover:bg-accent cursor-pointer"
-          >
-            Unpark Vehicle
-          </button>
-        </div>
+            <button
+              onClick={handleUnpark}
+              className="w-full bg-ink text-white font-display font-semibold py-3 rounded-lg hover:bg-slate transition"
+            >
+              Unpark Vehicle
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

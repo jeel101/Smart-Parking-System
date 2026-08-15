@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -55,13 +56,13 @@ public class VehicleImpl implements IVehicleService {
 
             if(request.getBookingType().equals("INSTANT")) {
                 startTime = LocalDateTime.now();
-                endTime = LocalDateTime.now().plusMinutes(1);
+                endTime = LocalDateTime.now().plusHours(12);
             }else {
                 startTime = request.getStartTime();
                 endTime = request.getEndTime();
             }
             return ticketRepository.findOverlappingTicket(slots,endTime, startTime).isEmpty();
-        }).toList();
+        }).collect(java.util.stream.Collectors.toList());
 
         if(availableSots.isEmpty()) {
             if(request.getBookingType().equals("INSTANT")) {
@@ -87,13 +88,15 @@ public class VehicleImpl implements IVehicleService {
     }
 
     @Override
+    @Transactional
     @CacheEvict(value = "slotAvailability", allEntries = true)
     public TicketDto parkBySelectedSlot(SlotParkingRequestDto request) {
 
-        Slot slot = slotRepository.findById(
-                request.getSlotId()
-        ).orElseThrow(() ->
-                new RuntimeException("Slot not found"));
+        Slot slot = slotRepository.findByIdWithLock(request.getSlotId())
+                .orElseThrow(() -> new RuntimeException("Slot not found"));
+
+        System.out.println("LOCK ACQUIRED FOR SLOT: " + slot.getSlotNum());
+        System.out.println("LOCK ACQUIRED BY THREAD: " + Thread.currentThread().getName());
 
         // find or create vehicle
         Vehicle vehicle =
@@ -188,6 +191,7 @@ public class VehicleImpl implements IVehicleService {
         ticketRepository.save(ticket);
     }
 
+    @Transactional
     @Scheduled(fixedRate = 60000)
     public void autoCloseExpiredReservations() {
         List<Ticket> expiredTickets = ticketRepository.findAllByStatusAndExitTimeBefore(TicketStatus.OPEN, LocalDateTime.now());
@@ -201,7 +205,9 @@ public class VehicleImpl implements IVehicleService {
                 slot.setSlotStatus(SlotStatus.AVAILABLE);
                 closeTicket(tickets);
             }
-            slotRepository.save(slot);
+            // no explicit save() needed inside a @Transactional method —
+            // dirty checking flushes changes to managed entities automatically
+//            slotRepository.save(slot);
             System.out.println("Ticket: " + tickets.getTicketNumber() + "has been expired and closed!");
         }
     }
@@ -235,21 +241,35 @@ public class VehicleImpl implements IVehicleService {
                                                  LocalDateTime startTime,
                                                  LocalDateTime endTime,
                                                  Slot slot)  {
+        System.out.println("BOOKING TYPE = " + bookingType);
+        System.out.println("START = " + startTime);
+        System.out.println("END = " + endTime);
         // reservation check
-        boolean isReservation = !bookingType.equals("INSTANT");
+        boolean instantBooking = bookingType.equals("INSTANT");
 
-        if(isReservation) {
-            boolean alreadyReserved = ticketRepository.existsOverlappingReservation(
-                    slot, endTime, startTime
+        LocalDateTime checkStart;
+        LocalDateTime checkEnd;
+
+        if(instantBooking) {
+            checkStart = LocalDateTime.now();
+            checkEnd = LocalDateTime.now().plusHours(12);
+        }else {
+            checkStart = startTime;
+            checkEnd = endTime;
+        }
+
+        boolean overlapping = ticketRepository.existsOverlappingReservation(slot, checkEnd, checkStart);
+        if(overlapping) {
+            throw new RuntimeException("Slot already booked for selected time");
+        }
+        if (overlapping) {
+            throw new RuntimeException(
+                    "Slot already booked for selected time"
             );
-
-            if(alreadyReserved) {
-                throw new RuntimeException("Slot already reserved for selected dates");
-            }
         }
 
         // validate dates only for reservation
-        if (isReservation) {
+        if (!instantBooking) {
             if (startTime.isBefore(LocalDateTime.now())) {
                 throw new RuntimeException("Start time must be future");
             }
@@ -266,18 +286,6 @@ public class VehicleImpl implements IVehicleService {
             throw new RuntimeException("Vehicle already parked");
         }
 
-        // for instant booking only, slot must not be occupied
-        if (!isReservation && slot.getSlotStatus() != SlotStatus.AVAILABLE) {
-            throw new RuntimeException(
-                    "Selected slot is occupied"
-            );
-        }
-
-        // mark slot status
-//        if (!isReservation) {
-//            slot.setSlotStatus(SlotStatus.OCCUPIED);
-//        }
-
         slotRepository.save(slot);
 
         // create ticket
@@ -291,8 +299,7 @@ public class VehicleImpl implements IVehicleService {
         ticket.setStatus(TicketStatus.OPEN);
 
         // reservation booking logic
-        if (isReservation) {
-
+        if (!instantBooking) {
             ticket.setEntryTime(startTime);
             ticket.setExitTime(endTime);
 

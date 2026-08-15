@@ -1,69 +1,104 @@
 import React from "react";
 
-export default function TicketCard({ ticket, showUnpark, onUnpark }) {
+const STATUS_CONFIG = {
+  OPEN: { label: "Active", chip: "bg-status-available/15 text-[#0a7a00]", dot: "bg-status-available" },
+  EXPIRED: { label: "Payment Pending", chip: "bg-status-reserved/20 text-[#8a6d00]", dot: "bg-status-reserved" },
+  CLOSED: { label: "Closed", chip: "bg-slate/15 text-slate", dot: "bg-slate" },
+};
+
+function Barcode() {
   return (
-    <div className="bg-light p-6 rounded-2xl shadow-md">
-      <div className="space-y-2 text-dark">
-        <p>
-          <strong>Ticket No:</strong> {ticket.ticketNumber}
-        </p>
+    <div
+      className="h-8 w-full rounded-sm opacity-70"
+      style={{
+        backgroundImage:
+          "repeating-linear-gradient(90deg, var(--color-ink) 0px, var(--color-ink) 2px, transparent 2px, transparent 4px, var(--color-ink) 4px, var(--color-ink) 5px, transparent 5px, transparent 8px)",
+      }}
+    />
+  );
+}
 
-        <p>
-          <strong>Vehicle Number:</strong> {ticket.vehicleNumber}
-        </p>
+export default function TicketCard({ ticket, showUnpark, onUnpark }) {
+  const status = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.CLOSED;
 
-        <p>
-          <strong>Vehicle Type:</strong> {ticket.vehicleType}
-        </p>
+  return (
+    <div className="flex bg-light rounded-2xl shadow-card border border-slate/10 overflow-hidden">
+      {/* ===== MAIN STUB ===== */}
+      <div className="flex-1 p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <p className="text-[10px] font-display font-semibold tracking-[0.2em] text-clay uppercase">
+              Parking Ticket
+            </p>
+            <p className="font-mono text-lg font-bold text-dark tracking-wide">
+              {ticket.ticketNumber}
+            </p>
+          </div>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-display font-semibold ${status.chip}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+            {status.label}
+          </span>
+        </div>
 
-        <p>
-          <strong>Slot Number:</strong> {ticket.slotNumber}
-        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+          <Field label="Vehicle No." value={ticket.vehicleNumber} mono />
+          <Field label="Type" value={ticket.vehicleType} />
+          <Field label="Slot" value={ticket.slotNumber} mono />
+          <Field label="Reservation" value={ticket.reservationType} />
+          <Field
+            label="Entry"
+            value={ticket.entryTime ? new Date(ticket.entryTime).toLocaleString() : "N/A"}
+          />
+          <Field
+            label="Exit"
+            value={ticket.exitTime ? new Date(ticket.exitTime).toLocaleString() : "Not yet"}
+          />
+        </div>
+      </div>
 
-        <p>
-          <strong>Reservation Type:</strong> {ticket.reservationType}
-        </p>
+      {/* ===== PERFORATED DIVIDER ===== */}
+      <div className="relative w-0 flex-shrink-0">
+        <span className="absolute -left-3 -top-3 w-6 h-6 rounded-full bg-base" />
+        <span className="absolute -left-3 -bottom-3 w-6 h-6 rounded-full bg-base" />
+        <div className="h-full border-l-2 border-dashed border-slate/25" />
+      </div>
 
-        <p>
-          <strong>Entry Time:</strong>{" "}
-          {ticket.entryTime
-            ? new Date(ticket.entryTime).toLocaleString()
-            : "N/A"}
-        </p>
+      {/* ===== TEAR-OFF STUB ===== */}
+      <div className="w-44 flex-shrink-0 bg-ink px-5 py-6 flex flex-col justify-between text-white">
+        <div>
+          <p className="text-[10px] font-display tracking-[0.2em] text-sand/70 uppercase">
+            Duration
+          </p>
+          <p className="font-mono font-semibold">
+            {ticket.duration ? `${ticket.duration} hrs` : "Pending"}
+          </p>
 
-        <p>
-          <strong>Exit Time:</strong>{" "}
-          {ticket.exitTime
-            ? new Date(ticket.exitTime).toLocaleString()
-            : "Not Yet"}
-        </p>
+          <p className="text-[10px] font-display tracking-[0.2em] text-sand/70 uppercase mt-3">
+            Fare
+          </p>
+          <p className="font-display text-2xl font-bold">₹{ticket.price || 0}</p>
+        </div>
 
-        <p>
-          <strong>Duration:</strong>{" "}
-          {ticket.duration ? `${ticket.duration} hrs` : "Pending"}
-        </p>
-
-        <p>
-          <strong>Price:</strong> ₹{ticket.price || 0}
-        </p>
-
-        <p>
-          <strong>Status:</strong> {ticket.status}
-        </p>
-
-        {ticket.status === "EXPIRED" && (
-          <p className="text-yellow-500 font-bold">⚠ Payment Pending</p>
-        )}
+        <Barcode />
 
         {showUnpark && (
           <button
             onClick={() => onUnpark(ticket.ticketNumber)}
-            className="mt-4 w-full bg-primary py-2 rounded-lg hover:bg-accent"
+            className="mt-4 w-full bg-clay hover:bg-sand hover:text-ink text-white text-sm font-display font-semibold py-2.5 rounded-lg transition"
           >
-            Unpark Vehicle
+            Unpark
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function Field({ label, value, mono }) {
+  return (
+    <div>
+      <p className="text-[10px] text-slate uppercase tracking-wide">{label}</p>
+      <p className={`text-dark font-medium ${mono ? "font-mono" : ""}`}>{value}</p>
     </div>
   );
 }
