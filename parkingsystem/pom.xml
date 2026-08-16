@@ -76,6 +76,12 @@
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 
+		<dependency>
+			<groupId>com.razorpay</groupId>
+			<artifactId>razorpay-java</artifactId>
+			<version>1.4.9</version> //x.y.z = the version you want to install
+		</dependency>
+
 	</dependencies>
 
 	<build>
