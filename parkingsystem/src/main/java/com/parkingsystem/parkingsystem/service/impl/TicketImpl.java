@@ -4,7 +4,7 @@ import com.parkingsystem.parkingsystem.dto.TicketDto;
 import com.parkingsystem.parkingsystem.entity.Ticket;
 import com.parkingsystem.parkingsystem.entity.TicketStatus;
 import com.parkingsystem.parkingsystem.repository.TicketRepository;
-import com.parkingsystem.parkingsystem.service.ITicketImpl;
+import com.parkingsystem.parkingsystem.service.ITicketService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,7 +12,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class TicketImpl  implements ITicketImpl {
+public class TicketImpl  implements ITicketService {
     private final TicketRepository ticketRepository;
     public List<TicketDto> getAllTickets(TicketStatus status) {
         return ticketRepository.findAllByStatus(status).stream().map(this::mapToTicketDto).toList();

@@ -24,7 +24,15 @@ public class Payment {
 
     private String razorpaySignature;
 
+    // NEW — every payment now starts against a Booking (the hold), not a Ticket,
+    // since the Ticket doesn't exist until the payment actually succeeds.
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "booking_id", nullable = false)
+    private Booking booking;
+
+    // CHANGED — was nullable = false. Must be optional now: this stays null
+    // from order-creation until verifyPayment() succeeds and creates the ticket.
     @OneToOne
-    @JoinColumn(name = "ticket_id", nullable = false)
+    @JoinColumn(name = "ticket_id")
     private Ticket ticket;
 }

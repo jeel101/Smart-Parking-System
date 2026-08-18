@@ -12,7 +12,6 @@ function App() {
       <main className="flex-1">
         <Outlet />
       </main>
-
       <Footer />
 
       {/* These were being passed as plain text children before, which

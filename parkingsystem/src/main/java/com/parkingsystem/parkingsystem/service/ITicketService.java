@@ -6,6 +6,6 @@ import com.parkingsystem.parkingsystem.entity.TicketStatus;
 
 import java.util.List;
 
-public interface ITicketImpl{
+public interface ITicketService {
     List<TicketDto> getAllTickets(TicketStatus status);
 }

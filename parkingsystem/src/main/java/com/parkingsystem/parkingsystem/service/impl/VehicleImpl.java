@@ -9,6 +9,7 @@ import com.parkingsystem.parkingsystem.repository.TicketRepository;
 import com.parkingsystem.parkingsystem.repository.VehicleRepository;
 import com.parkingsystem.parkingsystem.service.IVehicleService;
 import com.parkingsystem.parkingsystem.service.QueueService;
+import com.parkingsystem.parkingsystem.util.TicketPricingUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,9 +30,17 @@ public class VehicleImpl implements IVehicleService {
     private final SlotRepository slotRepository;
     private final TicketRepository ticketRepository;
     private final QueueService queueService;
+    private final TicketPricingUtil ticketPricingUtil;
     @Override
     @CacheEvict(value = "slotAvailability", allEntries = true)
     public TicketDto parkVehicle(TicketRequestDto request) {
+        // Reservations (DAILY/WEEKLY/MONTHLY) must go through /booking/initiate
+        // so they're payment-gated. This endpoint only ever hands out an
+        // immediate, unpaid-at-entry INSTANT ticket.
+        if(!"INSTANT".equals(request.getBookingType())) {
+            throw new RuntimeException("Reservations must be booked through the payment flow, not this endpoint");
+        }
+
         VehicleType type = VehicleType.valueOf(request.getVehicleType());
 
         List<VehicleType> allowedTypes = getAllowedTypes(type);
@@ -39,37 +49,38 @@ public class VehicleImpl implements IVehicleService {
 
         // find or create vehicle first
         Vehicle vehicle = vehicleRepository
-                        .findByVehicleNumber(request.getVehicleNumber())
-                        .orElseGet(() -> {
+                        .findByVehicleNumber(request.getVehicleNumber()).orElseGet(() -> {
                             Vehicle v = new Vehicle();
-                            v.setVehicleNumber(
-                                    request.getVehicleNumber()
-                            );
+                            v.setVehicleNumber(request.getVehicleNumber());
                             v.setVehicleType(type);
                             return vehicleRepository.save(v);
                         });
 
         //filter vehicles
-        List<Slot> availableSots = slot.stream().filter(slots -> {
-            LocalDateTime startTime;
-            LocalDateTime endTime;
+//        List<Slot> availableSots = slot.stream().filter(slots -> {
+//            LocalDateTime startTime;
+//            LocalDateTime endTime;
+//
+//            if(request.getBookingType().equals("INSTANT")) {
+//                startTime = LocalDateTime.now();
+//                endTime = LocalDateTime.now().plusHours(12);
+//            }else {
+//                startTime = request.getStartTime();
+//                endTime = request.getEndTime();
+//            }
+//            return ticketRepository.findOverlappingTicket(slots,endTime, startTime).isEmpty();
+//        }).collect(java.util.stream.Collectors.toList());
 
-            if(request.getBookingType().equals("INSTANT")) {
-                startTime = LocalDateTime.now();
-                endTime = LocalDateTime.now().plusHours(12);
-            }else {
-                startTime = request.getStartTime();
-                endTime = request.getEndTime();
-            }
-            return ticketRepository.findOverlappingTicket(slots,endTime, startTime).isEmpty();
-        }).collect(java.util.stream.Collectors.toList());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime windowEnd = now.plusHours(12);
+
+        List<Slot> availableSots = slot.stream().filter(
+                s -> ticketRepository.findOverlappingTicket(s, windowEnd, now).isEmpty()).collect(Collectors.toList()
+        );
 
         if(availableSots.isEmpty()) {
-            if(request.getBookingType().equals("INSTANT")) {
-                queueService.addToQueue(vehicle);
-                throw new RuntimeException("Parking full. Added to waiting queue.");
-            }
-            throw new RuntimeException("No slot available");
+            queueService.addToQueue(vehicle);
+            throw new RuntimeException("Parking full. Added to waiting queue.");
         }
 
         //sorting for nearest slot
@@ -78,19 +89,16 @@ public class VehicleImpl implements IVehicleService {
 
         Slot selectedSlot = availableSots.get(0);
 
-        return parkVehicleandCreateTicket(
-                vehicle,
-                request.getBookingType(),
-                request.getStartTime(),
-                request.getEndTime(),
-                selectedSlot
-        );
+        return parkVehicleandCreateTicket(vehicle, selectedSlot);
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "slotAvailability", allEntries = true)
     public TicketDto parkBySelectedSlot(SlotParkingRequestDto request) {
+        if(!"INSTANT".equals(request.getBookingType())) {
+            throw new RuntimeException("Reservations must be booked through the payment flow, not this endpoint");
+        }
 
         Slot slot = slotRepository.findByIdWithLock(request.getSlotId())
                 .orElseThrow(() -> new RuntimeException("Slot not found"));
@@ -100,39 +108,23 @@ public class VehicleImpl implements IVehicleService {
 
         // find or create vehicle
         Vehicle vehicle =
-                vehicleRepository
-                        .findByVehicleNumber(
-                                request.getVehicleNumber()
-                        )
+                vehicleRepository.findByVehicleNumber(request.getVehicleNumber())
                         .orElseGet(() -> {
                             Vehicle v = new Vehicle();
-
-                            v.setVehicleNumber(
-                                    request.getVehicleNumber()
-                            );
-                            v.setVehicleType(
-                                    slot.getSlotType()
-                            );
-
+                            v.setVehicleNumber(request.getVehicleNumber());
+                            v.setVehicleType(slot.getSlotType());
                             return vehicleRepository.save(v);
                         });
 
-        return parkVehicleandCreateTicket(
-                vehicle,
-                request.getBookingType(),
-                request.getStartTime(),
-                request.getEndTime(),
-                slot
-        );
+        return parkVehicleandCreateTicket(vehicle, slot);
     }
 
     @Override
     @CacheEvict(value = "slotAvailability", allEntries = true)
     public String unparkVehicle(String ticketNumber) {
         //find ticket
-        Ticket ticket = ticketRepository.findByTicketNumber(ticketNumber).orElseThrow(
-                () -> new RuntimeException("Ticket not found")
-        );
+        Ticket ticket = ticketRepository.findByTicketNumber(ticketNumber)
+                .orElseThrow(() -> new RuntimeException("Ticket not found"));
 
         // prevent double unpark
         if (ticket.getStatus() == TicketStatus.CLOSED) {
@@ -142,7 +134,6 @@ public class VehicleImpl implements IVehicleService {
         ticket.setStatus(TicketStatus.CLOSED);
         //free slot
         Slot slot = ticket.getSlot();
-//        slot.setSlotStatus(SlotStatus.AVAILABLE);
         slotRepository.save(slot);
 
         if (ticket.getReservationType() == ReservationType.INSTANT) {
@@ -171,21 +162,8 @@ public class VehicleImpl implements IVehicleService {
     }
 
     private void closeTicket(Ticket ticket) {
-        long hours = Duration.between(ticket.getEntryTime(),ticket.getExitTime()).toHours();
-
-        // minimum 1 hour charge
-        if (hours == 0) {
-            hours = 1;
-        }
-
-        double price;
-
-        switch (ticket.getVehicle().getVehicleType()) {
-            case CAR -> price = hours * 20;
-            case BIKE -> price = hours * 10;
-            case TRUCK -> price = hours * 40;
-            default -> price = hours * 20;
-        }
+        long hours = ticketPricingUtil.billableHours(ticket.getEntryTime(), ticket.getExitTime());
+        double price = ticketPricingUtil.calculateAmount(ticket.getVehicle().getVehicleType(), hours);
         ticket.setDuration(hours);
         ticket.setPrice(price);
         ticketRepository.save(ticket);
@@ -229,21 +207,18 @@ public class VehicleImpl implements IVehicleService {
         return dto;
     }
 
-    private String ticketGenerator() {
-        String ticketNumber = "TCKT-" + LocalDateTime.now().format(
-                DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
-        );
-        return ticketNumber;
-    }
+//    private String ticketGenerator() {
+//        String ticketNumber = "TCKT-" + LocalDateTime.now().format(
+//                DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+//        );
+//        return ticketNumber;
+//    }
 
-    private TicketDto parkVehicleandCreateTicket(Vehicle vehicle,
-                                                 String bookingType,
-                                                 LocalDateTime startTime,
-                                                 LocalDateTime endTime,
-                                                 Slot slot)  {
-        System.out.println("BOOKING TYPE = " + bookingType);
-        System.out.println("START = " + startTime);
-        System.out.println("END = " + endTime);
+    // Simplified: bookingType is now guaranteed INSTANT by the guards in
+    // parkVehicle/parkBySelectedSlot, so all the reservation-branch logic
+    // (date validation, duration/price-from-dates) that used to live here
+    // is gone — it was never reachable through a paid path anyway.
+    private TicketDto parkVehicleandCreateTicket(Vehicle vehicle, Slot slot)  {
 
         // prevent duplicate parking
         boolean alreadyParked = ticketRepository.existsByVehicleAndStatus(vehicle, TicketStatus.OPEN);
@@ -257,85 +232,30 @@ public class VehicleImpl implements IVehicleService {
             throw new RuntimeException("Vehicle type does not match slot type");
         }
 
-        // reservation check
-        boolean instantBooking = bookingType.equals("INSTANT");
+        LocalDateTime entry = LocalDateTime.now();
+        LocalDateTime exit = LocalDateTime.now().plusHours(12);
 
-        LocalDateTime checkStart;
-        LocalDateTime checkEnd;
 
-        if(instantBooking) {
-            checkStart = LocalDateTime.now();
-            checkEnd = LocalDateTime.now().plusHours(12);
-        }else {
-            checkStart = startTime;
-            checkEnd = endTime;
-        }
-
-        boolean overlapping = ticketRepository.existsOverlappingReservation(slot, checkEnd, checkStart);
+        // Guards a race between the availability check and this call —
+        // still relevant for INSTANT even without the reservation logic.
+        boolean overlapping = ticketRepository.existsOverlappingReservation(slot, exit, entry   );
         if(overlapping) {
             throw new RuntimeException("Slot already booked for selected time");
         }
-
-        // validate dates only for reservation
-        if (!instantBooking) {
-            if (startTime.isBefore(LocalDateTime.now())) {
-                throw new RuntimeException("Start time must be future");
-            }
-
-            if (endTime.isBefore(startTime)) {
-                throw new RuntimeException("End time must be after start time");
-            }
-        }
-
-
 
         slotRepository.save(slot);
 
         // create ticket
         Ticket ticket = new Ticket();
-        ticket.setTicketNumber(ticketGenerator());
+        ticket.setTicketNumber(ticketPricingUtil.generateTicketNumber());
         ticket.setSlot(slot);
         ticket.setVehicle(vehicle);
-        ticket.setReservationType(
-                ReservationType.valueOf(bookingType)
-        );
+        ticket.setReservationType(ReservationType.INSTANT);
         ticket.setStatus(TicketStatus.OPEN);
-
-        // reservation booking logic
-        if (!instantBooking) {
-            ticket.setEntryTime(startTime);
-            ticket.setExitTime(endTime);
-
-            long hours = Duration.between(
-                    startTime,
-                    endTime
-            ).toHours();
-
-            if (hours == 0) {
-                hours = 1;
-            }
-
-            double price;
-
-            switch (vehicle.getVehicleType()) {
-                case CAR -> price = hours * 20;
-                case BIKE -> price = hours * 10;
-                case TRUCK -> price = hours * 40;
-                default -> price = hours * 20;
-            }
-
-            ticket.setDuration(hours);
-            ticket.setPrice(price);
-
-        }
-
-        // instant booking logic
-        else {
-            ticket.setEntryTime(LocalDateTime.now());
-            ticket.setExitTime(LocalDateTime.now().plusHours(12));
-            ticket.setPrice(0);
-            ticket.setDuration(0L);
-        }
+        ticket.setEntryTime(entry);
+        ticket.setExitTime(exit);
+        ticket.setDuration(0L);
+        ticket.setPrice(0);
 
         Ticket saved = ticketRepository.save(ticket);
 

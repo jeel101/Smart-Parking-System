@@ -1,9 +1,10 @@
 package com.parkingsystem.parkingsystem.service;
 
 import com.parkingsystem.parkingsystem.dto.PaymentOrderResponseDto;
+import com.parkingsystem.parkingsystem.entity.Ticket;
 
 public interface IPaymentService {
-    PaymentOrderResponseDto createPaymentOrder (Long ticketId);
+    PaymentOrderResponseDto createPaymentOrder (Long bookingId);
 
-    void verifyPayment (String razorpayOrderId, String razorpayPaymentId, String razorpaySignature);
+    Ticket verifyPayment (String razorpayOrderId, String razorpayPaymentId, String razorpaySignature);
 }

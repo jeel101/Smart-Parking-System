@@ -2,6 +2,7 @@ package com.parkingsystem.parkingsystem.service.impl;
 
 import com.parkingsystem.parkingsystem.dto.SlotAvailabilityDto;
 import com.parkingsystem.parkingsystem.entity.*;
+import com.parkingsystem.parkingsystem.repository.BookingRepository;
 import com.parkingsystem.parkingsystem.repository.FloorRepository;
 import com.parkingsystem.parkingsystem.repository.SlotRepository;
 import com.parkingsystem.parkingsystem.repository.TicketRepository;
@@ -22,6 +23,7 @@ public class SlotImpl implements ISlotService{
     private final SlotRepository slotRepository;
     private final FloorRepository floorRepository;
     private final TicketRepository ticketRepository;
+    private final BookingRepository bookingRepository;
     @Override
     public List<Slot> createSlots(Long floorId, int totalSlots) {
         Floor floor = floorRepository.findById(floorId).
@@ -88,11 +90,7 @@ public class SlotImpl implements ISlotService{
         List<SlotAvailabilityDto> result = new ArrayList<>();
 
         for (Slot slot : allSlots) {
-            Optional<Ticket> overlappingticket =ticketRepository.findOverlappingTicket(
-                                    slot,
-                                    endTime,
-                                    startTime
-                            );
+            Optional<Ticket> overlappingticket =ticketRepository.findOverlappingTicket(slot, endTime, startTime);
 
             System.out.println("REQUEST:");
             System.out.println(startTime);
@@ -112,13 +110,22 @@ public class SlotImpl implements ISlotService{
                 else {
                     result.add(mapToDto(slot, false, "RESERVED"));
                 }
-            }else {
-                result.add(mapToDto(slot, true, "AVAILABLE"));
+                continue;
             }
+            // NEW: someone else's payment is currently in progress for this slot/window —
+            // this is the "temporarily reserved for payment" behavior from your diagram.
+            // Because this whole method is @Cacheable, this only matters for cache MISSES —
+            // BookingImpl's @CacheEvict(allEntries = true) on initiateBooking/confirmBooking/
+            // expireStaleBookings is what forces a fresh check to actually happen.
+            boolean hasActiveHold = !bookingRepository.findActiveOverlapping(slot, endTime, startTime).isEmpty();
+
+            if(hasActiveHold) {
+                result.add(mapToDto(slot, false, "RESERVED"));
+                continue;
+            }
+            result.add(mapToDto(slot, true, "AVAILABLE"));
         }
-        System.out.println(
-                "DB HIT FOR SLOT SEARCH"
-        );
+        System.out.println("DB HIT FOR SLOT SEARCH");
 
         return result;
     }

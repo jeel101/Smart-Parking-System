@@ -2,9 +2,7 @@ package com.parkingsystem.parkingsystem.controller;
 
 import com.parkingsystem.parkingsystem.dto.TicketDto;
 import com.parkingsystem.parkingsystem.entity.TicketStatus;
-import com.parkingsystem.parkingsystem.repository.TicketRepository;
-import com.parkingsystem.parkingsystem.service.ITicketImpl;
-import com.parkingsystem.parkingsystem.service.impl.TicketImpl;
+import com.parkingsystem.parkingsystem.service.ITicketService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @RequestMapping("/ticket")
 public class TicketController{
-    private final ITicketImpl iTicket;
+    private final ITicketService iTicket;
     @GetMapping("get-ticket/{status}")
     public ResponseEntity<List<TicketDto>> getAllTickets(@PathVariable TicketStatus status) {
         return ResponseEntity.ok(iTicket.getAllTickets(status));

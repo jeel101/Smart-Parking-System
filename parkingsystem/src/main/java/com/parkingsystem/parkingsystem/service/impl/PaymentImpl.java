@@ -1,11 +1,11 @@
 package com.parkingsystem.parkingsystem.service.impl;
 
 import com.parkingsystem.parkingsystem.dto.PaymentOrderResponseDto;
-import com.parkingsystem.parkingsystem.entity.Payment;
-import com.parkingsystem.parkingsystem.entity.PaymentStatus;
-import com.parkingsystem.parkingsystem.entity.Ticket;
+import com.parkingsystem.parkingsystem.entity.*;
+import com.parkingsystem.parkingsystem.repository.BookingRepository;
 import com.parkingsystem.parkingsystem.repository.PaymentRepository;
 import com.parkingsystem.parkingsystem.repository.TicketRepository;
+import com.parkingsystem.parkingsystem.service.IBookingService;
 import com.parkingsystem.parkingsystem.service.IPaymentService;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
@@ -20,7 +20,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class PaymentImpl implements IPaymentService {
     private final PaymentRepository paymentRepository;
-    private final TicketRepository ticketRepository;
+    private final BookingRepository bookingRepository;
+    private final IBookingService iBookingService;
     private final RazorpayClient razorpayClient;
 
     @Value("${razorpay.key.id}")
@@ -29,24 +30,28 @@ public class PaymentImpl implements IPaymentService {
     private String keySecret;
 
     @Override
-    public PaymentOrderResponseDto createPaymentOrder(Long ticketId) {
-        Ticket ticket = ticketRepository.findById(ticketId).
-                orElseThrow(() -> new RuntimeException("Ticket not found"));
+    public PaymentOrderResponseDto createPaymentOrder(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-        long amtInPaise = Math.round(ticket.getPrice() * 100);
+        if(booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+            throw new RuntimeException("Booking is not awaiting payment");
+        }
+
+        long amtInPaise = Math.round(booking.getAmount() * 100);
 
         try {
             JSONObject options = new JSONObject();
 
             options.put("amount", amtInPaise);
             options.put("currency", "INR");
-            options.put("receipt", ticket.getTicketNumber());
+            options.put("receipt", "BOOKING-" + booking.getId());
 
             Order order = razorpayClient.orders.create(options);
             Payment payment = new Payment();
 
-            payment.setTicket(ticket);
-            payment.setAmount(ticket.getPrice());
+            payment.setBooking(booking);
+            payment.setAmount(booking.getAmount());
             payment.setStatus(PaymentStatus.PENDING);
             payment.setRazorpayOrderId(order.get("id"));
 
@@ -59,7 +64,7 @@ public class PaymentImpl implements IPaymentService {
     }
 
     @Override
-    public void verifyPayment(String razorpayOrderId, String razorpayPaymentId, String razorpaySignature) {
+    public Ticket verifyPayment(String razorpayOrderId, String razorpayPaymentId, String razorpaySignature) {
         Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId).orElseThrow(
                 () -> new RuntimeException("Payment not found"));
 
@@ -82,7 +87,13 @@ public class PaymentImpl implements IPaymentService {
             payment.setRazorpayPaymentId(razorpayPaymentId);
             payment.setRazorpaySignature(razorpaySignature);
             payment.setStatus(PaymentStatus.SUCCESS);
+
+            //turn the paid hold into a real ticket.
+            Ticket ticket = iBookingService.confirmBooking(payment.getBooking());
+            payment.setTicket(ticket);
+
             paymentRepository.save(payment);
+            return ticket;
         }catch (RazorpayException e) {
             throw new RuntimeException("Payment verification failed", e);
         }
