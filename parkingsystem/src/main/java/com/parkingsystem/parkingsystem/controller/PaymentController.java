@@ -29,4 +29,9 @@ public class PaymentController {
 
         return ResponseEntity.ok(ticket);
     }
+
+    @PostMapping("/create-exit-order/{ticketNumber}")
+    public ResponseEntity<PaymentOrderResponseDto> createExitOrder(@PathVariable String ticketNumber) {
+        return ResponseEntity.ok(iPaymentService.createExitPaymentOrder(ticketNumber));
+    }
 }

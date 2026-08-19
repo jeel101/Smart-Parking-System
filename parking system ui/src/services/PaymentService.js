@@ -16,3 +16,8 @@ export const verifyPayment = async (paymentData) => {
 
     return response.data;
 };
+
+export const createExitPaymentOrder = async (ticketNumber) => {
+    const response = await apiClient.post(`/payment/create-exit-order/${ticketNumber}`);
+    return response.data;
+}

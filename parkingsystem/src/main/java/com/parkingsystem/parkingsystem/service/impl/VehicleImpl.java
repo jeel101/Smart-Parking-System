@@ -130,24 +130,12 @@ public class VehicleImpl implements IVehicleService {
         if (ticket.getStatus() == TicketStatus.CLOSED) {
             throw new RuntimeException("Ticket already closed");
         }
-        ticket.setExitTime(LocalDateTime.now());
-        ticket.setStatus(TicketStatus.CLOSED);
-        //free slot
-        Slot slot = ticket.getSlot();
-        slotRepository.save(slot);
 
-        if (ticket.getReservationType() == ReservationType.INSTANT) {
-            closeTicket(ticket);
+        //INSTANT tickets are unpaid at exit — they must go through the payment flow.
+        if(ticket.getReservationType() == ReservationType.INSTANT) {
+            throw new RuntimeException("Instant tickets must be closed through the payment flow, not this endpoint");
         }
-        //getting next vehicle from queue
-        Vehicle nextVehicle = queueService.getNext(slot.getSlotType());
-
-        if (nextVehicle != null) {
-            System.out.println("Next vehicle in queue: " + nextVehicle.getVehicleNumber());
-        }
-        ticketRepository.save(ticket);
-
-        return ("Ticket closed successfully" + ticket.getDuration() + " hours | Price: ₹" + ticket.getPrice());
+        return closeTicketAndFreeSlot(ticket);
     }
 
     private List<VehicleType> getAllowedTypes(VehicleType type) {
@@ -207,17 +195,6 @@ public class VehicleImpl implements IVehicleService {
         return dto;
     }
 
-//    private String ticketGenerator() {
-//        String ticketNumber = "TCKT-" + LocalDateTime.now().format(
-//                DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
-//        );
-//        return ticketNumber;
-//    }
-
-    // Simplified: bookingType is now guaranteed INSTANT by the guards in
-    // parkVehicle/parkBySelectedSlot, so all the reservation-branch logic
-    // (date validation, duration/price-from-dates) that used to live here
-    // is gone — it was never reachable through a paid path anyway.
     private TicketDto parkVehicleandCreateTicket(Vehicle vehicle, Slot slot)  {
 
         // prevent duplicate parking
@@ -260,5 +237,31 @@ public class VehicleImpl implements IVehicleService {
         Ticket saved = ticketRepository.save(ticket);
 
         return mapToTicketDto(saved);
+    }
+
+    @CacheEvict(value = "slotAvailability", allEntries = true)
+    @Override
+    public String confirmExit(Ticket ticket) {
+        return closeTicketAndFreeSlot(ticket);
+    }
+
+    private String closeTicketAndFreeSlot(Ticket ticket) {
+        ticket.setExitTime(LocalDateTime.now());
+        ticket.setStatus(TicketStatus.CLOSED);
+        //free slot
+        Slot slot = ticket.getSlot();
+        slotRepository.save(slot);
+
+        if (ticket.getReservationType() == ReservationType.INSTANT) {
+            closeTicket(ticket);
+        }
+        //getting next vehicle from queue
+        Vehicle nextVehicle = queueService.getNext(slot.getSlotType());
+
+        if (nextVehicle != null) {
+            System.out.println("Next vehicle in queue: " + nextVehicle.getVehicleNumber());
+        }
+        ticketRepository.save(ticket);
+        return ("Ticket closed successfully" + ticket.getDuration() + " hours | Price: ₹" + ticket.getPrice());
     }
 }

@@ -1,8 +1,16 @@
 import React from "react";
 
 const STATUS_CONFIG = {
-  OPEN: { label: "Active", chip: "bg-status-available/15 text-[#0a7a00]", dot: "bg-status-available" },
-  EXPIRED: { label: "Payment Pending", chip: "bg-status-reserved/20 text-[#8a6d00]", dot: "bg-status-reserved" },
+  OPEN: {
+    label: "Active",
+    chip: "bg-status-available/15 text-[#0a7a00]",
+    dot: "bg-status-available",
+  },
+  EXPIRED: {
+    label: "Payment Pending",
+    chip: "bg-status-reserved/20 text-[#8a6d00]",
+    dot: "bg-status-reserved",
+  },
   CLOSED: { label: "Closed", chip: "bg-slate/15 text-slate", dot: "bg-slate" },
 };
 
@@ -34,7 +42,9 @@ export default function TicketCard({ ticket, showUnpark, onUnpark }) {
               {ticket.ticketNumber}
             </p>
           </div>
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-display font-semibold ${status.chip}`}>
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-display font-semibold ${status.chip}`}
+          >
             <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
             {status.label}
           </span>
@@ -47,11 +57,19 @@ export default function TicketCard({ ticket, showUnpark, onUnpark }) {
           <Field label="Reservation" value={ticket.reservationType} />
           <Field
             label="Entry"
-            value={ticket.entryTime ? new Date(ticket.entryTime).toLocaleString() : "N/A"}
+            value={
+              ticket.entryTime
+                ? new Date(ticket.entryTime).toLocaleString()
+                : "N/A"
+            }
           />
           <Field
             label="Exit"
-            value={ticket.exitTime ? new Date(ticket.exitTime).toLocaleString() : "Not yet"}
+            value={
+              ticket.exitTime
+                ? new Date(ticket.exitTime).toLocaleString()
+                : "Not yet"
+            }
           />
         </div>
       </div>
@@ -76,14 +94,18 @@ export default function TicketCard({ ticket, showUnpark, onUnpark }) {
           <p className="text-[10px] font-display tracking-[0.2em] text-sand/70 uppercase mt-3">
             Fare
           </p>
-          <p className="font-display text-2xl font-bold">₹{ticket.price || 0}</p>
+          <p className="font-display text-2xl font-bold">
+            ₹{ticket.price || 0}
+          </p>
         </div>
 
         <Barcode />
 
         {showUnpark && (
           <button
-            onClick={() => onUnpark(ticket.ticketNumber)}
+            onClick={() =>
+              onUnpark(ticket.ticketNumber, ticket.reservationType)
+            }
             className="mt-4 w-full bg-clay hover:bg-sand hover:text-ink text-white text-sm font-display font-semibold py-2.5 rounded-lg transition"
           >
             Unpark
@@ -98,7 +120,9 @@ function Field({ label, value, mono }) {
   return (
     <div>
       <p className="text-[10px] text-slate uppercase tracking-wide">{label}</p>
-      <p className={`text-dark font-medium ${mono ? "font-mono" : ""}`}>{value}</p>
+      <p className={`text-dark font-medium ${mono ? "font-mono" : ""}`}>
+        {value}
+      </p>
     </div>
   );
 }

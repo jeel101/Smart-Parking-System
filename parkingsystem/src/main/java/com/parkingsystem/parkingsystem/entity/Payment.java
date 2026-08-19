@@ -26,8 +26,8 @@ public class Payment {
 
     // NEW — every payment now starts against a Booking (the hold), not a Ticket,
     // since the Ticket doesn't exist until the payment actually succeeds.
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "booking_id", nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "booking_id")
     private Booking booking;
 
     // CHANGED — was nullable = false. Must be optional now: this stays null
