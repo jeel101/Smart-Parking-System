@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "payments")
 @Getter
@@ -35,4 +37,7 @@ public class Payment {
     @OneToOne
     @JoinColumn(name = "ticket_id")
     private Ticket ticket;
+
+    @Column(name = "locked_exit_time")
+    private LocalDateTime lockedExitTime;
 }

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { validateReservationDates } from "../utils/validation";
 import { getEndDateLimits } from "../utils/calendarValidation";
 import { openRazorpayCheckout } from "../services/RazorpayService";
+import { createPaymentOrder } from "../services/PaymentService";
 
 const RESERVATION_TYPES = ["INSTANT", "DAILY", "WEEKLY", "MONTHLY"];
 
@@ -332,7 +333,7 @@ export default function Slot() {
       // -----------------------------------------------------
 
       await openRazorpayCheckout({
-        bookingId: booking.bookingId,
+        createOrder: () => createPaymentOrder(booking.bookingId),
 
         description: `Reservation for slot ${selectedSlot.slotNum}`,
 

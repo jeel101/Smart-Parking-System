@@ -85,7 +85,12 @@ export default function TicketDashboard() {
         {activeTab === "OPEN" && (
           <OpenTickets tickets={openTickets} refreshTickets={fetchTickets} />
         )}
-        {activeTab === "EXPIRED" && <ExpiredTickets tickets={expiredTickets} />}
+        {activeTab === "EXPIRED" && (
+          <ExpiredTickets
+            tickets={expiredTickets}
+            refreshTickets={fetchTickets}
+          />
+        )}
         {activeTab === "CLOSED" && <ClosedTickets tickets={closedTickets} />}
       </div>
     </div>

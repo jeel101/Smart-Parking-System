@@ -210,6 +210,7 @@ public class VehicleImpl implements IVehicleService {
         }
 
         LocalDateTime entry = LocalDateTime.now();
+//        LocalDateTime exit = LocalDateTime.now().plusMinutes(1);
         LocalDateTime exit = LocalDateTime.now().plusHours(12);
 
 
@@ -241,26 +242,41 @@ public class VehicleImpl implements IVehicleService {
 
     @CacheEvict(value = "slotAvailability", allEntries = true)
     @Override
-    public String confirmExit(Ticket ticket) {
-        return closeTicketAndFreeSlot(ticket);
+    public String confirmExit(Ticket ticket, LocalDateTime lockedExitTime, Double lockedAmount) {
+        if(ticket.getStatus() == TicketStatus.OPEN) {
+            long hours = ticketPricingUtil.billableHours(ticket.getEntryTime(), lockedExitTime);
+            ticket.setExitTime(lockedExitTime);
+            ticket.setDuration(hours);
+            ticket.setPrice(lockedAmount);
+        }
+        // EXPIRED tickets: already frozen by the scheduler — leave as-is.
+        ticket.setStatus(TicketStatus.CLOSED);
+        freeSlotAndAdvanceQueue(ticket.getSlot());
+        ticketRepository.save(ticket);
+
+        return "Ticket closed successfully" + ticket.getDuration() + " hours | Price: ₹" + ticket.getPrice();
     }
 
+    //Shared by confirmExit and the reservation direct-close path below.
+    private void freeSlotAndAdvanceQueue(Slot slot) {
+        slotRepository.save(slot);
+
+        Vehicle nextVehicle = queueService.getNext(slot.getSlotType());
+        if (nextVehicle != null) {
+            System.out.println("Next vehicle in queue: " + nextVehicle.getVehicleNumber());
+        }
+    }
+
+    //used by unparkVehicle for reservation tickets — unchanged behavior)
+    // to use the same helper instead of duplicating the slot/queue lines:
     private String closeTicketAndFreeSlot(Ticket ticket) {
         ticket.setExitTime(LocalDateTime.now());
         ticket.setStatus(TicketStatus.CLOSED);
-        //free slot
-        Slot slot = ticket.getSlot();
-        slotRepository.save(slot);
 
         if (ticket.getReservationType() == ReservationType.INSTANT) {
             closeTicket(ticket);
         }
-        //getting next vehicle from queue
-        Vehicle nextVehicle = queueService.getNext(slot.getSlotType());
-
-        if (nextVehicle != null) {
-            System.out.println("Next vehicle in queue: " + nextVehicle.getVehicleNumber());
-        }
+        freeSlotAndAdvanceQueue(ticket.getSlot());
         ticketRepository.save(ticket);
         return ("Ticket closed successfully" + ticket.getDuration() + " hours | Price: ₹" + ticket.getPrice());
     }

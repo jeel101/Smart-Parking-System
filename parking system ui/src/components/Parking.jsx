@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { unparkVehicle } from "../services/UnParkService";
+import { createExitPaymentOrder } from "../services/PaymentService";
+import { openRazorpayCheckout } from "../services/RazorpayService";
 
 export default function Parking() {
   const [mode, setMode] = useState("park"); // "park" | "unpark"
@@ -65,7 +67,27 @@ export default function Parking() {
         setUnparkError("");
       }, 1500);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unparking failed");
+      const msg = err.response?.data?.message || "";
+
+      if (msg.includes("payment flow")) {
+        try {
+          await openRazorpayCheckout({
+            createOrder: () => createExitPaymentOrder(ticketNumber.trim()),
+            description: `Exit payment for ${ticketNumber.trim()}`,
+            onSuccess: () => {
+              toast.success("Payment successful — ticket closed!");
+              setTicketNumber("");
+              setUnparkError("");
+            },
+            onDismiss: () =>
+              toast.info("Payment cancelled — ticket stays open"),
+          });
+        } catch {
+          toast.error("Unable to start exit payment");
+        }
+      } else {
+        toast.error(msg || "Unparking failed");
+      }
     }
   };
 

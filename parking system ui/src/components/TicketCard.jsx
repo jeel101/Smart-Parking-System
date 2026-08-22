@@ -6,10 +6,15 @@ const STATUS_CONFIG = {
     chip: "bg-status-available/15 text-[#0a7a00]",
     dot: "bg-status-available",
   },
-  EXPIRED: {
+  EXPIRED_INSTANT: {
     label: "Payment Pending",
     chip: "bg-status-reserved/20 text-[#8a6d00]",
     dot: "bg-status-reserved",
+  },
+  EXPIRED_RESERVED: {
+    label: "Reservation Ended",
+    chip: "bg-slate/15 text-slate",
+    dot: "bg-slate",
   },
   CLOSED: { label: "Closed", chip: "bg-slate/15 text-slate", dot: "bg-slate" },
 };
@@ -27,7 +32,14 @@ function Barcode() {
 }
 
 export default function TicketCard({ ticket, showUnpark, onUnpark }) {
-  const status = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.CLOSED;
+  let statusKey = ticket.status;
+  if (ticket.status === "EXPIRED") {
+    statusKey =
+      ticket.reservationType === "INSTANT"
+        ? "EXPIRED_INSTANT"
+        : "EXPIRED_RESERVED";
+  }
+  const status = STATUS_CONFIG[statusKey] || STATUS_CONFIG.CLOSED;
 
   return (
     <div className="flex bg-light rounded-2xl shadow-card border border-slate/10 overflow-hidden">

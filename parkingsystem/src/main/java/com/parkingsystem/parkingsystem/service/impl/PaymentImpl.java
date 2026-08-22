@@ -100,8 +100,9 @@ public class PaymentImpl implements IPaymentService {
                 payment.setTicket(ticket);
             }else {
                 // Exit path: ticket already existed; payment unlocks closing it.
-                ticket = payment.getTicket();
-                iVehicleService.confirmExit(ticket);
+                Ticket t = payment.getTicket();
+                iVehicleService.confirmExit(t, payment.getLockedExitTime(), payment.getAmount());
+                ticket = t;
             }
 
             paymentRepository.save(payment);
@@ -117,12 +118,27 @@ public class PaymentImpl implements IPaymentService {
         Ticket ticket = ticketRepository.findByTicketNumber(ticketNumber).
                 orElseThrow(() -> new RuntimeException("Ticket not found"));
 
-        if(ticket.getStatus() != TicketStatus.OPEN) {
-            throw new RuntimeException("Ticket is not open");
+        if(ticket.getStatus() != TicketStatus.OPEN && ticket.getStatus() != TicketStatus.EXPIRED) {
+            throw new RuntimeException("Ticket is not eligible for payment");
         }
 
-        long hours = ticketPricingUtil.billableHours(ticket.getEntryTime(), LocalDateTime.now());
-        double amount = ticketPricingUtil.calculateAmount(ticket.getVehicle().getVehicleType(), hours);
+        Payment payment = new Payment();
+        payment.setTicket(ticket);
+        payment.setStatus(PaymentStatus.PENDING);
+
+        double amount;
+
+        if(ticket.getStatus() == TicketStatus.EXPIRED)  {
+            // Already frozen by autoCloseExpiredReservations at the 12-hour mark.
+            // Reuse it as-is — don't recompute against "now".
+            amount = ticket.getPrice();
+        }else {
+            LocalDateTime exitTime = LocalDateTime.now();
+            long hours = ticketPricingUtil.billableHours(ticket.getEntryTime(), exitTime);
+            amount = ticketPricingUtil.calculateAmount(ticket.getVehicle().getVehicleType(), hours);
+            payment.setLockedExitTime(exitTime);
+        }
+
         long amtInPaise = Math.round(amount * 100);
 
         try {
@@ -133,11 +149,8 @@ public class PaymentImpl implements IPaymentService {
             options.put("receipt", "EXIT-" + ticket.getId());
 
             Order order = razorpayClient.orders.create(options);
-            Payment payment = new Payment();
 
-            payment.setTicket(ticket);
             payment.setAmount(amount);
-            payment.setStatus(PaymentStatus.PENDING);
             payment.setRazorpayOrderId(order.get("id"));
 
             paymentRepository.save(payment);
