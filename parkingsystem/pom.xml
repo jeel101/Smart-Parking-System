@@ -11,6 +11,7 @@
 	<groupId>com.parkingsystem</groupId>
 	<artifactId>parkingsystem</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	<packaging>jar</packaging>
 	<name/>
 	<description/>
 	<url/>
@@ -79,7 +80,12 @@
 		<dependency>
 			<groupId>com.razorpay</groupId>
 			<artifactId>razorpay-java</artifactId>
-			<version>1.4.9</version> //x.y.z = the version you want to install
+			<version>1.4.9</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
 	</dependencies>
