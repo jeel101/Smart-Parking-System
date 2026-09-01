@@ -8,7 +8,6 @@ import Login from "./components/Login.jsx";
 import AdminSlot from "./components/admin/AdminSlot.jsx";
 import PakringDashboard from "./components/PakringDashboard.jsx";
 import TicketDashboard from "./components/TicketDashboard.jsx";
-import Floor from "./components/Floor.jsx";
 
 const router = createBrowserRouter([
   {
@@ -34,10 +33,6 @@ const router = createBrowserRouter([
       {
         path: "/parking-dashboard",
         element: <PakringDashboard />,
-      },
-      {
-        path: "/floor",
-        element: <Floor />,
       },
     ],
   },

@@ -18,11 +18,6 @@ import java.util.List;
 @RequestMapping("/slot")
 public class SlotController {
     private final ISlotService iSlotService;
-    @PostMapping("/create-slot/{floorId}")
-    public ResponseEntity<String> createSlots(@PathVariable Long floorId, @RequestParam int totalSlots) {
-        iSlotService.createSlots(floorId, totalSlots);
-        return ResponseEntity.status(HttpStatus.CREATED).body("Slot is created");
-    }
     //count of all slots within parking lot
     @GetMapping("/parking-lot/{parkingLotId}/count")
     public ResponseEntity<Integer> getCountOfAllSlots(@PathVariable Long parkingLotId) {

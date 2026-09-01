@@ -9,4 +9,5 @@ public interface IFloorService {
     Floor addFloor(Long parkingLotId);
     int getFloorCount(Long parkingLotId);
     List<Floor> getFloors(Long parkingLotId);
+    void createParkingSetup(Long parkingLotId, int totalFloors, int slotsPerFloor);
 }

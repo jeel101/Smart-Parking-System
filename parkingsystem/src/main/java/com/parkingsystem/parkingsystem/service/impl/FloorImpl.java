@@ -5,8 +5,10 @@ import com.parkingsystem.parkingsystem.entity.ParkingLot;
 import com.parkingsystem.parkingsystem.repository.FloorRepository;
 import com.parkingsystem.parkingsystem.repository.ParkingLotRepository;
 import com.parkingsystem.parkingsystem.service.IFloorService;
+import com.parkingsystem.parkingsystem.service.ISlotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -15,6 +17,7 @@ import java.util.List;
 public class FloorImpl implements IFloorService {
     private final FloorRepository floorRepository;
     private final ParkingLotRepository parkingLotRepository;
+    private final ISlotService iSlotService;
 
     @Override
     public Floor addFloor(Long parkingLotId) {
@@ -42,5 +45,14 @@ public class FloorImpl implements IFloorService {
     @Override
     public List<Floor> getFloors(Long parkingLotId) {
         return floorRepository.findByParkingLot_Id(parkingLotId);
+    }
+
+    @Transactional
+    @Override
+    public void createParkingSetup(Long parkingLotId, int totalFloors, int slotsPerFloor) {
+        for (int i=0; i<totalFloors; i++) {
+            Floor floor = addFloor(parkingLotId);
+            iSlotService.createSlots(floor.getId(), slotsPerFloor);
+        }
     }
 }
