@@ -6,10 +6,9 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import App from "./App.jsx";
 import Login from "./components/Login.jsx";
 import AdminSlot from "./components/admin/AdminSlot.jsx";
-import Slot from "./components/Slot.jsx";
-import Parking from "./components/Parking.jsx";
 import PakringDashboard from "./components/PakringDashboard.jsx";
 import TicketDashboard from "./components/TicketDashboard.jsx";
+import Floor from "./components/Floor.jsx";
 
 const router = createBrowserRouter([
   {
@@ -35,6 +34,10 @@ const router = createBrowserRouter([
       {
         path: "/parking-dashboard",
         element: <PakringDashboard />,
+      },
+      {
+        path: "/floor",
+        element: <Floor />,
       },
     ],
   },
