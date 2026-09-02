@@ -5,7 +5,7 @@ import "./index.css";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import App from "./App.jsx";
 import Login from "./components/Login.jsx";
-import AdminSlot from "./components/admin/AdminSlot.jsx";
+import AdminFloor from "./components/admin/AdminManagement.jsx";
 import PakringDashboard from "./components/PakringDashboard.jsx";
 import TicketDashboard from "./components/TicketDashboard.jsx";
 
@@ -24,7 +24,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/admin",
-        element: <AdminSlot />,
+        element: <AdminFloor />,
       },
       {
         path: "/ticket-dashboard",

@@ -13,7 +13,8 @@ export default function Header() {
   const navigate = useNavigate();
   const role = localStorage.getItem("parkwise_role"); // "admin" | "user" | null
 
-  const links = role === "admin" ? ADMIN_LINKS : role === "user" ? USER_LINKS : [];
+  const links =
+    role === "admin" ? ADMIN_LINKS : role === "user" ? USER_LINKS : [];
 
   const handleSwitchRole = () => {
     localStorage.removeItem("parkwise_role");
@@ -23,7 +24,16 @@ export default function Header() {
   return (
     <header className="bg-ink border-b border-black/10 px-6 py-4 sticky top-0 z-40">
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-6">
-        <Link to={role ? (role === "admin" ? "/admin" : "/parking-dashboard") : "/login"} className="flex items-center gap-2 shrink-0">
+        <Link
+          to={
+            role
+              ? role === "admin"
+                ? "/admin"
+                : "/parking-dashboard"
+              : "/login"
+          }
+          className="flex items-center gap-2 shrink-0"
+        >
           <span className="w-2.5 h-2.5 rounded-full bg-status-available animate-pulseDot" />
           <span className="font-display text-lg font-bold text-white tracking-wide">
             ParkWise
