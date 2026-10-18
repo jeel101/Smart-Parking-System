@@ -10,6 +10,7 @@ import com.parkingsystem.parkingsystem.repository.VehicleRepository;
 import com.parkingsystem.parkingsystem.service.IVehicleService;
 import com.parkingsystem.parkingsystem.service.QueueService;
 import com.parkingsystem.parkingsystem.util.TicketPricingUtil;
+import com.parkingsystem.parkingsystem.util.VehicleValidationUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,9 +32,14 @@ public class VehicleImpl implements IVehicleService {
     private final TicketRepository ticketRepository;
     private final QueueService queueService;
     private final TicketPricingUtil ticketPricingUtil;
+    private final VehicleValidationUtil vehicleValidationUtil;
     @Override
     @CacheEvict(value = "slotAvailability", allEntries = true)
     public TicketDto parkVehicle(TicketRequestDto request) {
+
+        //validate vehicle number first
+        String vehicleNumber = vehicleValidationUtil.validateVehicleNumber(request.getVehicleNumber());
+
         // Reservations (DAILY/WEEKLY/MONTHLY) must go through /booking/initiate
         // so they're payment-gated. This endpoint only ever hands out an
         // immediate, unpaid-at-entry INSTANT ticket.
@@ -48,13 +54,19 @@ public class VehicleImpl implements IVehicleService {
         List<Slot> slot = slotRepository.findByFloor_ParkingLot_Id_AndSlotTypeIn(1L, allowedTypes);
 
         // find or create vehicle first
-        Vehicle vehicle = vehicleRepository
-                        .findByVehicleNumber(request.getVehicleNumber()).orElseGet(() -> {
-                            Vehicle v = new Vehicle();
-                            v.setVehicleNumber(request.getVehicleNumber());
-                            v.setVehicleType(type);
-                            return vehicleRepository.save(v);
-                        });
+        Vehicle vehicle = vehicleRepository.findByVehicleNumber(vehicleNumber).map(
+                existingVehicle -> {
+                    if(existingVehicle.getVehicleType() != type) {
+                        throw new IllegalArgumentException("Vehicle type does not match registered vehicle type");
+                    }
+                    return existingVehicle;
+                }).orElseGet(() -> {
+                Vehicle v = new Vehicle();
+                v.setVehicleNumber(vehicleNumber);
+                v.setVehicleType(type);
+                return vehicleRepository.save(v);
+                });
+
 
         //filter vehicles
 //        List<Slot> availableSots = slot.stream().filter(slots -> {

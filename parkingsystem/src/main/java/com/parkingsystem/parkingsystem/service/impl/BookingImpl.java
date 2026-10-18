@@ -9,6 +9,7 @@ import com.parkingsystem.parkingsystem.repository.TicketRepository;
 import com.parkingsystem.parkingsystem.repository.VehicleRepository;
 import com.parkingsystem.parkingsystem.service.IBookingService;
 import com.parkingsystem.parkingsystem.util.TicketPricingUtil;
+import com.parkingsystem.parkingsystem.util.VehicleValidationUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -26,6 +27,7 @@ public class BookingImpl implements IBookingService {
     private final TicketRepository ticketRepository;
     private final VehicleRepository vehicleRepository;
     private final TicketPricingUtil ticketPricingUtil;
+    private final VehicleValidationUtil vehicleValidationUtil;
 
     // how long a payment hold is valid before the slot is released back
     private static final long HOLD_MINUTES = 10;
@@ -34,6 +36,10 @@ public class BookingImpl implements IBookingService {
     @Transactional
     @CacheEvict(value = "slotAvailability", allEntries = true)
     public BookingInitialResponseDto initialBooking(SlotParkingRequestDto request) {
+
+        //validate vehicle number first
+        String vehicleNumber = vehicleValidationUtil.validateVehicleNumber(request.getVehicleNumber());
+
         Slot slot = slotRepository.findByIdWithLock(request.getSlotId())
                 .orElseThrow(() -> new RuntimeException("Slot not found"));
 
@@ -51,7 +57,7 @@ public class BookingImpl implements IBookingService {
         // Same guards parkVehicleandCreateTicket runs — only relevant if this
         // vehicle number already exists. Vehicle creation itself still waits
         // until confirmBooking() (payment success), same as before.
-        vehicleRepository.findByVehicleNumber(request.getVehicleNumber()).ifPresent(vehicle -> {
+        vehicleRepository.findByVehicleNumber(vehicleNumber).ifPresent(vehicle -> {
             if (vehicle.getVehicleType() != slot.getSlotType()) {
                 throw new RuntimeException("Vehicle type does not match slot type");
             }
@@ -76,7 +82,7 @@ public class BookingImpl implements IBookingService {
 
         Booking booking = new Booking();
         booking.setSlot(slot);
-        booking.setVehicleNumber(request.getVehicleNumber());
+        booking.setVehicleNumber(vehicleNumber);
         booking.setVehicleType(slot.getSlotType());
         booking.setReservationType(ReservationType.valueOf(request.getBookingType()));
         booking.setStartTime(start);
