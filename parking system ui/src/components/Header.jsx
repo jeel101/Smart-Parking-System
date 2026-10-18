@@ -36,7 +36,7 @@ export default function Header() {
         >
           <span className="w-2.5 h-2.5 rounded-full bg-status-available animate-pulseDot" />
           <span className="font-display text-lg font-bold text-white tracking-wide">
-            ParkWise
+            ParkEase
           </span>
         </Link>
 

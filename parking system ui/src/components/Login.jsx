@@ -21,7 +21,7 @@ export default function Login() {
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="w-2.5 h-2.5 rounded-full bg-status-available animate-pulseDot" />
             <span className="font-display text-2xl font-bold text-dark tracking-wide">
-              ParkWise
+              ParkEase
             </span>
           </div>
           <p className="text-slate">Choose how you'd like to continue</p>
