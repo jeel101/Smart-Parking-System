@@ -4,7 +4,7 @@ A full-stack, multi-floor parking management system with reservation-based booki
 
 **Stack:** Spring Boot · Hibernate/JPA · MySQL · Redis · React · Tailwind CSS · Razorpay
 
-**Live Demo:** https://parkease-f8e8k37iz-acme-e728.vercel.app
+**Live Demo:** https://parkeaseui.vercel.app
 
 ### ⚠️ Performance & Render Cold Starts
 
