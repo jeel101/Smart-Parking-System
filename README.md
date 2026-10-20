@@ -6,6 +6,17 @@ A full-stack, multi-floor parking management system with reservation-based booki
 
 **Live Demo:** https://parkease-f8e8k37iz-acme-e728.vercel.app
 
+### ⚠️ Performance & Render Cold Starts
+
+The backend service is hosted on **Render's Free Tier**, which automatically spins down the web service after a period of inactivity.
+
+- **Initial Load / Cold Start:** On the first request after inactivity, the JVM and Spring Boot application can take **2 to 10+ minutes** to perform a cold boot and initialize database connections.
+- **Subsequent Requests:** Once awake, all API endpoints respond instantly with typical low latency.
+- **Status Check:** You can verify backend readiness directly via the health endpoint:
+  ```http
+  GET (https://smart-parking-system-f5n6.onrender.com/actuator/health)
+  ```
+
 ---
 
 ## Overview
@@ -19,6 +30,7 @@ The project was built iteratively, starting from basic CRUD slot management and 
 ## Key Features
 
 **Parking Core**
+
 - Multi-floor slot management with per-floor and per-lot availability counts
 - Vehicle entry/exit lifecycle with automatic vehicle registration by number plate
 - Four booking types: `INSTANT` (walk-in), `DAILY`, `WEEKLY`, `MONTHLY`
@@ -27,18 +39,21 @@ The project was built iteratively, starting from basic CRUD slot management and 
 - Automatic queueing when a vehicle type has no available slot
 
 **Payments**
+
 - Full Razorpay integration: server-side order creation, signature verification, and payment confirmation
 - **Reservations are payment-gated before the ticket exists** — a temporary `Booking` hold is created first (`PENDING_PAYMENT` → `PAID`/`EXPIRED`/`CANCELLED`), and the real `Ticket` is only created after payment is verified
 - **Walk-in exits are payment-gated before the ticket closes** — the fare is calculated and locked in when exit is requested, charged through Razorpay, and only then does the ticket close and the slot free up
 - Fare is calculated once and never silently recalculated after payment, so the amount charged always matches the amount recorded
 
 **Concurrency & Reliability**
+
 - Pessimistic row-level locking on slot selection to prevent two simultaneous bookings of the same slot
-- Booking holds block *other* in-progress payments on the same slot/date range — a slot mid-checkout shows as reserved, not available, to everyone else
+- Booking holds block _other_ in-progress payments on the same slot/date range — a slot mid-checkout shows as reserved, not available, to everyone else
 - Scheduler-based auto-expiry: abandoned payment holds release the slot after a timeout; overstayed instant tickets are automatically flagged and priced at a fixed window
 - Redis caching on slot-availability lookups, with cache eviction wired into every booking, payment, and unpark event to avoid serving stale availability
 
 **Frontend**
+
 - Visual slot map with live status coloring (available / reserved / occupied) and a legend
 - Integrated Razorpay Checkout flow triggered directly from slot selection or ticket unparking
 - Ticket dashboard (Open / Expired / Closed tabs, 30-second auto-refresh) styled as ticket-stub cards
@@ -110,6 +125,7 @@ parkwise/
 
 1. Create a MySQL database and a Redis instance (local or Docker).
 2. Set the following in `application.properties` / environment variables:
+
    ```properties
    spring.datasource.url=jdbc:mysql://localhost:3306/parkwise
    spring.datasource.username=<your-username>
@@ -121,6 +137,7 @@ parkwise/
    razorpay.key.id=<your-razorpay-key-id>
    razorpay.key.secret=<your-razorpay-key-secret>
    ```
+
 3. Run the Spring Boot application (`./mvnw spring-boot:run` or via your IDE).
 
 ### Frontend
@@ -136,19 +153,19 @@ parkwise/
 
 ## API Overview
 
-| Area | Endpoint | Purpose |
-|---|---|---|
-| Slots | `GET /slot/available` | Slot availability for a floor + date range |
-| Slots | `POST /slot/create-slot/{floorId}` | Admin: create slots on a floor |
-| Floors | `GET /floor/parking-lot/{lotId}` | List floors |
-| Vehicles | `POST /vehicle/park-by-slot` | Instant walk-in parking |
-| Vehicles | `POST /vehicle/request-exit/{ticketNumber}` | Lock in exit fare before payment |
-| Vehicles | `POST /vehicle/unpark/{ticketNumber}` | Close a reservation ticket (already paid) |
-| Bookings | `POST /booking/initiate` | Create a payment hold for a reservation |
-| Payments | `POST /payment/create-order/{bookingId}` | Razorpay order for a reservation |
-| Payments | `POST /payment/create-exit-order/{ticketNumber}` | Razorpay order for a walk-in exit fare |
-| Payments | `POST /payment/verify` | Verify signature, finalize ticket |
-| Tickets | `GET /ticket/get-ticket/{status}` | Tickets by status (OPEN/EXPIRED/CLOSED) |
+| Area     | Endpoint                                         | Purpose                                    |
+| -------- | ------------------------------------------------ | ------------------------------------------ |
+| Slots    | `GET /slot/available`                            | Slot availability for a floor + date range |
+| Slots    | `POST /slot/create-slot/{floorId}`               | Admin: create slots on a floor             |
+| Floors   | `GET /floor/parking-lot/{lotId}`                 | List floors                                |
+| Vehicles | `POST /vehicle/park-by-slot`                     | Instant walk-in parking                    |
+| Vehicles | `POST /vehicle/request-exit/{ticketNumber}`      | Lock in exit fare before payment           |
+| Vehicles | `POST /vehicle/unpark/{ticketNumber}`            | Close a reservation ticket (already paid)  |
+| Bookings | `POST /booking/initiate`                         | Create a payment hold for a reservation    |
+| Payments | `POST /payment/create-order/{bookingId}`         | Razorpay order for a reservation           |
+| Payments | `POST /payment/create-exit-order/{ticketNumber}` | Razorpay order for a walk-in exit fare     |
+| Payments | `POST /payment/verify`                           | Verify signature, finalize ticket          |
+| Tickets  | `GET /ticket/get-ticket/{status}`                | Tickets by status (OPEN/EXPIRED/CLOSED)    |
 
 ---
 
