@@ -1,4 +1,4 @@
-# ParkWise
+# ParkEase
 
 A full-stack, multi-floor parking management system with reservation-based booking, dynamic pricing, and a real payment gateway integration — built as a portfolio project to explore concurrency-safe booking, caching, and payment-gated ticket lifecycles.
 
@@ -21,7 +21,7 @@ The backend service is hosted on **Render's Free Tier**, which automatically spi
 
 ## Overview
 
-ParkWise manages a parking lot end to end: floors and slots, vehicle entry/exit, walk-in and advance reservations, dynamic hourly pricing, and payment collection through Razorpay — with the concurrency safeguards needed so two people can't pay for the same slot at once.
+ParkEase manages a parking lot end to end: floors and slots, vehicle entry/exit, walk-in and advance reservations, dynamic hourly pricing, and payment collection through Razorpay — with the concurrency safeguards needed so two people can't pay for the same slot at once.
 
 The project was built iteratively, starting from basic CRUD slot management and layering in caching, pessimistic locking, and a full payment-hold architecture as the system grew closer to how a real paid parking product would need to behave.
 
@@ -95,7 +95,7 @@ A background scheduler flips any `Booking` still `PENDING_PAYMENT` past its expi
 ## Project Structure
 
 ```
-parkwise/
+parkease/
 ├── backend/
 │   └── src/main/java/com/parkingsystem/parkingsystem/
 │       ├── entity/          # Slot, Floor, Ticket, Vehicle, Booking, Payment, enums
@@ -126,8 +126,8 @@ parkwise/
 1. Create a MySQL database and a Redis instance (local or Docker).
 2. Set the following in `application.properties` / environment variables:
 
-   ```properties
-   spring.datasource.url=jdbc:mysql://localhost:3306/parkwise
+```properties
+   spring.datasource.url=jdbc:mysql://localhost:3306/parkease
    spring.datasource.username=<your-username>
    spring.datasource.password=<your-password>
 
@@ -136,7 +136,7 @@ parkwise/
 
    razorpay.key.id=<your-razorpay-key-id>
    razorpay.key.secret=<your-razorpay-key-secret>
-   ```
+```
 
 3. Run the Spring Boot application (`./mvnw spring-boot:run` or via your IDE).
 
@@ -144,9 +144,11 @@ parkwise/
 
 1. `cd frontend && npm install`
 2. Add the Razorpay Checkout script to `index.html`:
-   ```html
-   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-   ```
+
+```html
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+```
+
 3. `npm run dev`
 
 ---
